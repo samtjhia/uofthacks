@@ -4,7 +4,11 @@ import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { Mic, MicOff, Smile, Frown, Meh, Heart, MessageCircle } from 'lucide-react';
 
 export default function RightSidebar() {
-  const { isListening, toggleListening, suggestions, setTypedText, addHistoryItem, isAutoMode, toggleAutoMode } = useStore();
+  const { isListening, toggleListening, suggestions, setTypedText, addHistoryItem, isAutoMode, toggleAutoMode, fetchSuggestions, reinforceHabit } = useStore();
+  
+  React.useEffect(() => {
+    fetchSuggestions();
+  }, [fetchSuggestions]);
   
   // Use a ref to track if we should auto-restart to avoid closure staleness
   const autoModeRef = React.useRef(isAutoMode);
@@ -121,7 +125,11 @@ export default function RightSidebar() {
           {suggestions.map((sug, idx) => (
              <button
                key={sug.id}
-               onClick={(e) => { e.currentTarget.blur(); setTypedText(sug.text); }}
+               onClick={(e) => { 
+                reinforceHabit(sug.text);
+                setTypedText(sug.text);
+                e.currentTarget.blur();
+               }}
                className="w-full text-left p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 transition-all group relative overflow-hidden"
              >
                 {/* Subtle highlight effect on hover */}

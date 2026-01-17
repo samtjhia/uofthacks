@@ -18,9 +18,13 @@ import {
 } from 'lucide-react';
 
 export default function LeftSidebar() {
-  const { history, isListening } = useStore((state: AppState) => state);
+  const { history, isListening, fetchHistory } = useStore((state: AppState) => state);
   const [activeTab, setActiveTab] = useState<'history' | 'brain'>('history');
   const dummyRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetchHistory();
+  }, []);
 
   useEffect(() => {
     if (activeTab === 'history') {

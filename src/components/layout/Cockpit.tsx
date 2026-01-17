@@ -68,8 +68,20 @@ export default function Cockpit() {
       {/* HEADER / STATUS - Compact */}
       <div className="flex items-center justify-between px-6 py-4 shrink-0 gap-4">
         {/* VISUALIZER */}
-        <div className="flex-1 h-12 rounded-2xl bg-slate-800/30 backdrop-blur-sm overflow-hidden relative border border-white/5">
+        <div className={`flex-1 h-12 rounded-2xl bg-slate-800/30 backdrop-blur-sm overflow-hidden relative border transition-all duration-300 ${
+          isListening 
+            ? "border-neon-green shadow-[0_0_15px_rgba(57,255,20,0.3)]" 
+            : "border-white/5"
+        }`}>
             <WaveformVisualizer isActive={isListening} />
+            
+            {isListening && (
+              <div className="absolute top-2 right-3 flex items-center gap-1.5 z-20 bg-black/40 backdrop-blur-md px-2 py-0.5 rounded-full border border-neon-green/30">
+                <div className="w-1.5 h-1.5 rounded-full bg-neon-green animate-pulse" />
+                <span className="text-[9px] font-bold text-neon-green tracking-widest">LISTENING</span>
+              </div>
+            )}
+
             {!isListening && (
                 <div className="absolute inset-0 flex items-center justify-center text-slate-600 gap-2">
                     <Activity className="w-3.5 h-3.5" />

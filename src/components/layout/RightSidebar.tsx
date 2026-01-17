@@ -1,9 +1,53 @@
 import React from 'react';
 import { useStore } from '@/store/useStore';
+import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { Mic, MicOff, Smile, Frown, Meh, Heart, MessageCircle } from 'lucide-react';
 
 export default function RightSidebar() {
-  const { isListening, toggleListening, suggestions, setTypedText, typedText } = useStore();
+  const { isListening, toggleListening, suggestions, setTypedText, addHistoryItem } = useStore();
+  const { startRecording, stopRecording } = useAudioRecorder();
+
+  const handleToggleListening = async () => {
+    if (!isListening) {
+      // Start recording
+      try {
+        await startRecording();
+        toggleListening(); // Updates UI to "listening" state
+      } catch (err) {
+        console.error("Failed to start recording:", err);
+      }
+    } else {
+      // Stop recording
+      toggleListening(); // Updates UI to "not listening" state immediately
+      try {
+        const blob = await stopRecording();
+        if (blob) {
+          const formData = new FormData();
+          formData.append('file', blob, 'audio.webm');
+
+          const response = await fetch('/api/listen', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            // Add partner's speech to history
+            addHistoryItem({
+              id: crypto.randomUUID(),
+              role: 'assistant', // Represents partner
+              content: `Partner: "${data.text}"`,
+              timestamp: new Date().toISOString(),
+            });
+          } else {
+            console.error("Whisper API error:", await response.text());
+          }
+        }
+      } catch (err) {
+        console.error("Failed to stop recording or process audio:", err);
+      }
+    }
+  };
 
   return (
     <aside className="w-80 h-full border-l border-slate-700/30 bg-slate-900/80 backdrop-blur-xl flex flex-col font-sans text-slate-200">
@@ -52,7 +96,7 @@ export default function RightSidebar() {
             </span>
             
           <button
-            onClick={toggleListening}
+            onClick={handleToggleListening}
             className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 shadow-xl ${
               isListening
                 ? 'bg-red-500 text-white shadow-[0_0_40px_rgba(239,68,68,0.4)] animate-pulse'

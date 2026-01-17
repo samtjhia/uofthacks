@@ -26,8 +26,9 @@ export async function POST(req: NextRequest) {
     const transcription = await openai.audio.transcriptions.create({
       file: file,
       model: 'whisper-1',
-      prompt: 'listening to a conversation. only transcribe speech.',
       response_format: 'verbose_json',
+      temperature: 0.0,
+      language: 'en',
     }) as any;
 
     const text = transcription.text.trim();
@@ -40,34 +41,40 @@ export async function POST(req: NextRequest) {
         const avgNoSpeech = segments.reduce((sum: number, seg: any) => sum + seg.no_speech_prob, 0) / segments.length;
         const avgLogProb = segments.reduce((sum: number, seg: any) => sum + seg.avg_logprob, 0) / segments.length;
 
-        // Rule: If no_speech_prob > 0.4 (40% probability of silence), return empty string
-        if (avgNoSpeech > 0.4) return NextResponse.json({ text: '[No speech detected]' });
-        
-        // Rule: If avg_logprob < -1.0 (Low confidence), return empty string
-        if (avgLogProb < -1.0) return NextResponse.json({ text: '[No speech detected]' });
+        // Rule: If no_speech_prob > 0.5 (Increased tolerance slightly), return empty
+        if (avgNoSpeech > 0.5) return NextResponse.json({ text: '[No speech detected]' });
       }
     }
 
-    // 2. Hallucination Filter
-    const HALLUCINATIONS = [
-      'Thank you.',
-      'You.',
-      'You',
+    // 2. Hallucination Filter (Known bad phrases from YouTube subtitles training data)
+    const HALLUCINATION_PHRASES = [
+      'Thank you for watching',
+      'Thanks for watching',
+      'Please subscribe',
+      'comments section',
+      'Any questions or comments',
       'MBC News',
       'Copyright',
-      'Bye.',
-      '.',
-      'Subtitle by...',
-      'Computers enhancing communication with teammates',
+      'Subtitle by',
+      'translated by',
+      'Amara.org',
+      'Computers enhancing communication'
+    ];
+    
+    // Strict Short-Phrase Filter
+    const EXACT_HALLUCINATIONS = [
+       'You.', 'Bye.', 'Thank you.', '.'
     ];
 
-    // If text matches typical Whisper hallucinations or is extremely short, ignore it
     const normalizedText = text.toLowerCase().trim();
-    const isHallucination = HALLUCINATIONS.some(
-      h => normalizedText === h.toLowerCase().trim()
-    );
+    
+    // Check for partial matches of long known hallucinations
+    const containsHallucination = HALLUCINATION_PHRASES.some(h => normalizedText.includes(h.toLowerCase()));
+    
+    // Check for exact matches of short glitches
+    const isExactHallucination = EXACT_HALLUCINATIONS.some(h => normalizedText === h.toLowerCase());
 
-    if (isHallucination || text.length < 2) {
+    if (containsHallucination || isExactHallucination || text.length < 2) {
       return NextResponse.json({ text: '[No speech detected]' });
     }
 

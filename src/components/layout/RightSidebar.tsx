@@ -30,13 +30,18 @@ export default function RightSidebar() {
       if (response.ok) {
         const data = await response.json();
         
-        // Add partner's speech to history
-        addHistoryItem({
-          id: crypto.randomUUID(),
-          role: 'assistant', // Represents partner
-          content: `Partner: "${data.text}"`,
-          timestamp: new Date().toISOString(),
-        });
+        // Only add to history if it's actual speech
+        const isIgnored = data.text === '[No speech detected]' || !data.text || data.text.trim().length === 0;
+        
+        if (!isIgnored) {
+            // Add partner's speech to history
+            addHistoryItem({
+            id: crypto.randomUUID(),
+            role: 'assistant', // Represents partner
+            content: `Partner: "${data.text}"`,
+            timestamp: new Date().toISOString(),
+          });
+        }
 
         // AUTO MODE: Restart recording if enabled
         if (autoModeRef.current) {
@@ -96,7 +101,7 @@ export default function RightSidebar() {
     } else {
       // Switching OFF
       toggleAutoMode();
-      // Do not stop recording immediately; let it finish pending phrase
+      await stopRecording();
     }
   };
 

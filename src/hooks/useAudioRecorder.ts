@@ -128,7 +128,7 @@ export function useAudioRecorder(onFinished?: (blob: Blob) => void): UseAudioRec
       silenceStartRef.current = Date.now();
       hasSpokenRef.current = false;
       
-      const SILENCE_THRESHOLD = 30; // Adaptive threshold might be better, but let's try 30.
+      const SILENCE_THRESHOLD = 25; // Lowered from 35 back to 25 for better sensitivity
       const SILENCE_DURATION = 1500; 
       
       const detectSilence = () => {

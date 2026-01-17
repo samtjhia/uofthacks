@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore, AppState } from '../../store/useStore';
+import { speakText } from '@/lib/elevenlabs';
 import { 
   Volume2, 
   Activity, 
@@ -29,21 +30,7 @@ export default function LeftSidebar() {
 
   const handlePlay = async (text: string) => {
     try {
-      const response = await fetch('/api/speak', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
-
-      if (!response.ok) {
-        console.error('Failed to generate speech');
-        return;
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audio.play();
+      await speakText(text);
     } catch (error) {
       console.error('Error playing audio:', error);
     }

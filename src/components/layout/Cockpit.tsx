@@ -1,9 +1,11 @@
+"use client";
 import React, { useEffect } from 'react';
 import { useStore } from '@/store/useStore';
 import { Activity, Volume2, X, Delete } from 'lucide-react';
 import VirtualKeyboard from './VirtualKeyboard';
 import PictureGrid from './PictureGrid';
 import WaveformVisualizer from '../ui/WaveformVisualizer';
+import { speakText } from '@/lib/elevenlabs';
 
 export default function Cockpit() {
   const { isListening, inputMode, setInputMode, typedText, setTypedText, suggestions } = useStore();
@@ -43,10 +45,12 @@ export default function Cockpit() {
     setTypedText(typedText ? `${typedText} ${label}` : label);
   };
   
-  const handleSpeak = () => {
-     // TODO: Connect to ElevenLabs hooked in Phase 3
-     console.log("Speaking:", typedText);
-  };
+    const handleSpeak = async () => {
+      if (!typedText) return;
+      console.log('Speaking:', typedText);
+      const ok = await speakText(typedText);
+      if (!ok) console.error('TTS failed');
+    };
 
   const handleClear = () => {
     setTypedText('');

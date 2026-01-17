@@ -24,6 +24,7 @@ ts-debug.log*
 
 # local env files
 .env*.local
+.env
 
 # vercel
 .vercel
@@ -31,3 +32,4 @@ ts-debug.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.env

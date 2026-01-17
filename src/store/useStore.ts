@@ -9,6 +9,12 @@ export interface AppState {
   toggleLeftSidebar: () => void;
   isRightSidebarOpen: boolean;
   toggleRightSidebar: () => void;
+  
+  // Audio State
+  audioLevel: number;
+  setAudioLevel: (level: number) => void;
+  isAutoMode: boolean;
+  toggleAutoMode: () => void;
 
   inputMode: 'text' | 'picture' | 'spark';
   setInputMode: (mode: 'text' | 'picture' | 'spark') => void;
@@ -45,6 +51,11 @@ export const useStore = create<AppState>((set) => ({
   toggleLeftSidebar: () => set((state) => ({ isLeftSidebarOpen: !state.isLeftSidebarOpen })),
   isRightSidebarOpen: true,
   toggleRightSidebar: () => set((state) => ({ isRightSidebarOpen: !state.isRightSidebarOpen })),
+
+  audioLevel: 0,
+  setAudioLevel: (level) => set({ audioLevel: level }),
+  isAutoMode: false,
+  toggleAutoMode: () => set((state) => ({ isAutoMode: !state.isAutoMode })),
 
   inputMode: 'text',
   setInputMode: (mode) => set({ inputMode: mode }),

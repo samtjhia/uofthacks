@@ -4,48 +4,99 @@ import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { Mic, MicOff, Smile, Frown, Meh, Heart, MessageCircle } from 'lucide-react';
 
 export default function RightSidebar() {
-  const { isListening, toggleListening, suggestions, setTypedText, addHistoryItem } = useStore();
-  const { startRecording, stopRecording } = useAudioRecorder();
+  const { isListening, toggleListening, suggestions, setTypedText, addHistoryItem, isAutoMode, toggleAutoMode } = useStore();
+  
+  // Use a ref to track if we should auto-restart to avoid closure staleness
+  const autoModeRef = React.useRef(isAutoMode);
+  React.useEffect(() => { autoModeRef.current = isAutoMode; }, [isAutoMode]);
 
-  const handleToggleListening = async () => {
-    if (!isListening) {
-      // Start recording
-      try {
-        await startRecording();
-        toggleListening(); // Updates UI to "listening" state
-      } catch (err) {
-        console.error("Failed to start recording:", err);
+  // Ref to hold the startRecording function so the callback can access it
+  const startRecordingRef = React.useRef<() => Promise<void>>();
+
+  const handleRecordingFinished = React.useCallback(async (blob: Blob) => {
+    if (useStore.getState().isListening) {
+      toggleListening();
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('file', blob, 'audio.webm');
+
+      const response = await fetch('/api/listen', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Add partner's speech to history
+        addHistoryItem({
+          id: crypto.randomUUID(),
+          role: 'assistant', // Represents partner
+          content: `Partner: "${data.text}"`,
+          timestamp: new Date().toISOString(),
+        });
+
+        // AUTO MODE: Restart recording if enabled
+        if (autoModeRef.current) {
+            // Tiny delay to allow UI to breathe
+            setTimeout(() => {
+                 startRecordingRef.current?.();
+                 toggleListening();
+            }, 500);
+        }
+
+      } else {
+        console.error("Whisper API error:", await response.text());
+      }
+    } catch (err) {
+      console.error("Failed to stop recording or process audio:", err);
+    }
+  }, [addHistoryItem, toggleListening]); // removed isAutoMode to avoid recreation
+
+  const { startRecording, stopRecording } = useAudioRecorder(handleRecordingFinished);
+  
+  // Update ref when startRecording changes
+  React.useEffect(() => { startRecordingRef.current = startRecording; }, [startRecording]);
+
+  // Prevent Auto-Restart on Manual Stop?
+  // If user clicks Stop, we call stopRecording -> onFinished fires -> checks AutoMode -> Restart.
+  // This is an infinite loop trap.
+  // Solution: If user manually toggles listening off, we should temporarily disable auto-restart 
+  // OR we rely on the fact that `isListening` state is used? No.
+  // We need to know 'Why' it stopped.
+  // Let's rely on the user turning off "Auto Mode" switch if they want to stop fully.
+  // OR: If they click the big red button, it stops AND turns off Auto Mode.
+  
+  const handleManualStop = async () => {
+      if (isListening) {
+          if (isAutoMode) toggleAutoMode(); // Disable auto if manual stop
+          await stopRecording(); 
+      } else {
+          try {
+            await startRecording();
+            toggleListening();
+          } catch (err) { console.error(err); }
+      }
+  };
+
+  const handleToggleAutoMode = async () => {
+    if (!isAutoMode) {
+      // Switching ON
+      toggleAutoMode();
+      if (!isListening) {
+        try {
+          await startRecording();
+          toggleListening();
+        } catch (err) {
+          console.error("Failed to auto-start recording:", err);
+        }
       }
     } else {
-      // Stop recording
-      toggleListening(); // Updates UI to "not listening" state immediately
-      try {
-        const blob = await stopRecording();
-        if (blob) {
-          const formData = new FormData();
-          formData.append('file', blob, 'audio.webm');
-
-          const response = await fetch('/api/listen', {
-            method: 'POST',
-            body: formData,
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            // Add partner's speech to history
-            addHistoryItem({
-              id: crypto.randomUUID(),
-              role: 'assistant', // Represents partner
-              content: `Partner: "${data.text}"`,
-              timestamp: new Date().toISOString(),
-            });
-          } else {
-            console.error("Whisper API error:", await response.text());
-          }
-        }
-      } catch (err) {
-        console.error("Failed to stop recording or process audio:", err);
-      }
+      // Switching OFF
+      toggleAutoMode();
+      // Do not stop recording immediately; let it finish pending phrase
     }
   };
 
@@ -96,7 +147,7 @@ export default function RightSidebar() {
             </span>
             
           <button
-            onClick={handleToggleListening}
+            onClick={handleManualStop}
             className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 shadow-xl ${
               isListening
                 ? 'bg-red-500 text-white shadow-[0_0_40px_rgba(239,68,68,0.4)] animate-pulse'
@@ -109,6 +160,23 @@ export default function RightSidebar() {
               <Mic className="w-8 h-8" />
             )}
           </button>
+          
+           {/* Auto Mode Toggle */}
+           <div className="mt-4 flex items-center gap-3">
+             <span className={`text-xs font-semibold ${isAutoMode ? 'text-green-400' : 'text-slate-500'}`}>
+                {isAutoMode ? 'AUTO LOOP ON' : 'AUTO LOOP OFF'}
+             </span>
+             <button
+               onClick={handleToggleAutoMode}
+               className={`w-12 h-6 rounded-full relative transition-colors ${
+                 isAutoMode ? 'bg-green-500/20 shadow-[0_0_10px_rgba(74,222,128,0.2)]' : 'bg-slate-700'
+               }`}
+             >
+               <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-300 ${
+                 isAutoMode ? 'left-7 bg-green-400' : 'left-1 bg-slate-400'
+               }`} />
+             </button>
+           </div>
         </div>
 
         {/* TONE SELECTOR */}

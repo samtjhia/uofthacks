@@ -8,7 +8,7 @@ import WaveformVisualizer from '../ui/WaveformVisualizer';
 import { speakText } from '@/lib/elevenlabs';
 
 export default function Cockpit() {
-  const { isListening, inputMode, setInputMode, typedText, setTypedText, suggestions } = useStore();
+  const { isListening, inputMode, setInputMode, typedText, setTypedText, suggestions, addHistoryItem } = useStore();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -45,12 +45,21 @@ export default function Cockpit() {
     setTypedText(typedText ? `${typedText} ${label}` : label);
   };
   
-    const handleSpeak = async () => {
-      if (!typedText) return;
-      console.log('Speaking:', typedText);
-      const ok = await speakText(typedText);
-      if (!ok) console.error('TTS failed');
-    };
+  const handleSpeak = async () => {
+    if (!typedText) return;
+    console.log('Speaking:', typedText);
+    const ok = await speakText(typedText);
+    if (ok) {
+      addHistoryItem({
+        id: Date.now().toString(),
+        role: 'user',
+        content: typedText,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      console.error('TTS failed');
+    }
+  };
 
   const handleClear = () => {
     setTypedText('');
@@ -65,23 +74,11 @@ export default function Cockpit() {
   return (
     <div className="flex-1 h-full flex flex-col bg-slate-900 text-slate-100 font-sans overflow-hidden">
       
-      {/* HEADER / STATUS - Compact */}
-      <div className="flex items-center justify-between px-6 py-4 shrink-0 gap-4">
-        {/* VISUALIZER */}
-        <div className={`flex-1 h-12 rounded-2xl bg-slate-800/30 backdrop-blur-sm overflow-hidden relative border transition-all duration-300 ${
-          isListening 
-            ? "border-neon-green shadow-[0_0_15px_rgba(57,255,20,0.3)]" 
-            : "border-white/5"
-        }`}>
+      {/* HEADER */}
+      <div className="shrink-0 px-6 py-4 flex items-center justify-between gap-4">
+        {/* Visualizer / Status */}
+        <div className="flex-1 h-12 rounded-2xl bg-slate-800/30 backdrop-blur-sm overflow-hidden relative border border-white/5">
             <WaveformVisualizer isActive={isListening} />
-            
-            {isListening && (
-              <div className="absolute top-2 right-3 flex items-center gap-1.5 z-20 bg-black/40 backdrop-blur-md px-2 py-0.5 rounded-full border border-neon-green/30">
-                <div className="w-1.5 h-1.5 rounded-full bg-neon-green animate-pulse" />
-                <span className="text-[9px] font-bold text-neon-green tracking-widest">LISTENING</span>
-              </div>
-            )}
-
             {!isListening && (
                 <div className="absolute inset-0 flex items-center justify-center text-slate-600 gap-2">
                     <Activity className="w-3.5 h-3.5" />
@@ -91,12 +88,12 @@ export default function Cockpit() {
         </div>
 
         {/* MODE TOGGLES */}
-        <div className="h-10 bg-slate-800 p-1 rounded-xl flex items-center shrink-0 border border-white/5">
+        <div className="h-12 bg-slate-800/50 p-1 rounded-2xl flex items-center shrink-0 border border-white/5 backdrop-blur-sm">
             {(['text', 'picture', 'spark'] as const).map((mode) => (
                 <button 
                   key={mode}
                   onClick={() => setInputMode(mode)}
-                  className={`px-4 h-full rounded-lg text-xs font-semibold transition-all duration-200 capitalize ${
+                  className={`px-4 h-full rounded-xl text-xs font-bold transition-all duration-200 capitalize ${
                     inputMode === mode 
                     ? 'bg-slate-600 text-white shadow-sm' 
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
@@ -108,7 +105,7 @@ export default function Cockpit() {
         </div>
       </div>
 
-      {/* INPUT ZONE - Row 2 (Now Middle) */}
+      {/* MIDDLE ROW (Input) */}
       <div className="shrink-0 px-6 pb-4 flex items-stretch gap-3">
         {/* INPUT BAR + CLEAR */}
         <div className="flex-1 h-16 bg-slate-800/50 backdrop-blur-md rounded-2xl px-5 flex items-center shadow-lg border border-white/5 focus-within:bg-slate-800/80 transition-all relative group">
@@ -152,7 +149,7 @@ export default function Cockpit() {
         </div>
       </div>
 
-      {/* SUGGESTIONS PILLS - Row 1 (Now Bottom - larger) */}
+      {/* BOTTOM ROW (Suggestions) */}
       {inputMode === 'text' && (
         <div className="shrink-0 px-6 pb-4">
             <div className="flex gap-3 h-14 overflow-x-auto scrollbar-hide">
@@ -173,7 +170,7 @@ export default function Cockpit() {
         </div>
       )}
 
-      {/* MAIN WORKSPACE - Grow Container */}
+      {/* MAIN WORKSPACE */}
       <div className="flex-1 min-h-0 bg-slate-800/20 border-t border-white/5 relative flex flex-col">
            {/* Subtle Grid Background */}
            <div className="absolute inset-0 pointer-events-none opacity-[0.03]" 
@@ -199,7 +196,6 @@ export default function Cockpit() {
               )}
            </div>
       </div>
-
     </div>
   );
 }

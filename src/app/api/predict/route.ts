@@ -17,7 +17,7 @@ const openai = new OpenAI({
 
 export async function POST(req: NextRequest) {
   try {
-    const { text, history, time, schedule, userProfile, habits } = await req.json();
+    const { text, history, lastPartnerMessage, time, schedule, userProfile, habits } = await req.json();
 
     // Check Keys based on provider
     if (ACTIVE_PROVIDER === 'gemini' && !process.env.GEMINI_API_KEY) {
@@ -51,18 +51,21 @@ export async function POST(req: NextRequest) {
       You are an advanced predictive engine for users with speech impairments. Your job is to predict the user's *intended next word* by fusing 5 real-time context signals.
       
       # The 5 Signals (Hierarchy of Importance):
-      1. **Signal 6 [The Filter]**: HARD CONSTRAINT. Predictions MUST start with the user's current input: "${text}". 
-         - **EXCEPTION**: If input is EMPTY, predict 4 distinct conversation starters based on Schedule/History/Time.
-      2. **Signal 1 [The Listener]**: CRITICAL PRIORITY. Conversation Continuity. If the last message was a question, suggesting a direct answer is the top priority.
+      1. **Signal 6 [The Filter]**: HARD CONSTRAINT. Predictions MUST start with the current input: "${text}". 
+         - **EXCEPTION**: If input is EMPTY, predict 4 distinct conversation starters or RESPONSES based on History.
+      2. **Signal 1 [The Listener]**: **CRITICAL - MAXIMUM PRIORITY**. If the last history message is from 'partner' or is a QUESTION, your main job is to answer it. Ignoring a direct question is a failure.
       3. **Signal 4 [The Habits]**: High Priority. Users repeat themselves. If a frequent habit matches the input/context, it wins.
       4. **Signal 2 [The Scheduler]**: Context Booster. If the schedule says "Art Class", boost words like "paint", "color", "canvas".
       5. **Signal 5 [The Grammar]**: Syntactic Validity. Ensure the sentence makes grammatical sense.
 
       # Current State Signals
       ${systemContext}
-      [Signal 1 - Recent History]:
+      [Signal 1 - Recent History (MOST IMPORTANT FOR CONTEXT)]:
       ${history || "None"}
       
+      [Signal 1.5 - LATEST PARTNER MESSAGE (The Trigger)]:
+      "${lastPartnerMessage || "None"}"
+
       [Signal 4 - Habit Bank]:
       ${habits && habits.length > 0 ? habits.slice(0, 50).join(', ') : "None provided"}
 
@@ -70,16 +73,22 @@ export async function POST(req: NextRequest) {
       "${text}"
 
       # Prediction Algorithm (Execute Step-by-Step):
-      1. **Check History (Signal 1)**: IMMEDIATELY analyze the last incoming message. Does it demand a response (Who/What/Where/When)? If yes, prioritize answers in the predictions.
-      2. **Analyze Schedule**: Extract keywords related to the current "${schedule}" context.
-      3. **Filter Habits**: Check if any provided habits match the current input "${text}".
-      4. **Synthesize**: Generate 4 predictions that satisfy the Filter Constraint ("${text}...") and maximize Context Relevance.
-         - *Conflict Rule*: If History demands an answer (e.g., "Do you want water?"), predict "Yes"/"No" or relevant answers BEFORE schedule/habit suggestions.
+      1. **Status Check**: Is the input "${text}" empty?
+      2. **IF INPUT IS EMPTY**: 
+         - **FOCUS ON [Signal 1.5 - LATEST PARTNER MESSAGE]**: This is the message you are responding to. Ignore older history if this is present.
+         - **CASE A: Partner Message is a QUESTION**: Your 4 predictions MUST be direct answers to it.
+            - Example: "What is your name?" -> Predictions: "My name is...", "Sam", "I'm Sam", "Don't ask".
+         - **CASE B: Partner Message is a STATEMENT/GREETING** (e.g. "Hello there"): Your predictions MUST be relevant follow-ups/replies.
+            - Example: "Hello there" -> Predictions: "Hi!", "How are you?", "Good to see you", "Hey".
+         - **CASE C: No Partner Message**: Suggest conversational starters based on Schedule/Location.
+      3. **IF INPUT IS NOT EMPTY**:
+         - Filter suggested habits/words to strictly start with "${text}".
+         - Prioritize words that *complete the answer* to the previous question if applicable.
       
       # Output Format
       Return a SINGLE JSON object. No markdown.
       {
-        "thought_process": "1-sentence explanation of how you used Schedule/History to choose these specific words.",
+        "thought_process": "Explain why you chose these words. If History was used, explicitly mention 'Answering Question: [Question]'.",
         "predictions": [
           { "word": "Label1", "sentence": "Complete, conversational sentence." },
           { "word": "Label2", "sentence": "Complete, conversational sentence." },

@@ -127,9 +127,11 @@ export default function Cockpit() {
   ];
 
   // Logic update: Trust the store's suggestions (which now come from Grammar and Gemini).
-  // CRITICAL: User requirement - If input is empty (or just whitespace), ALWAYS show defaults in bubbles.
+  // CRITICAL UPDATE: If input is empty, we default to [Yes, No, Hi, Thanks]...
+  // UNLESS we have high-quality predictions from the "Brain" because the partner just spoke.
+  // We can detect this if 'suggestions' are populated even when typedText is empty.
   const wordSuggestions = (!typedText || typedText.trim() === '')
-    ? DEFAULTS
+    ? (suggestions.length > 0 && !suggestions[0].id.startsWith('grammar-') ? suggestions.slice(0, 4) : DEFAULTS)
     : suggestions.slice(0, 4);
 
   return (

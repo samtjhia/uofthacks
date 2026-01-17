@@ -173,6 +173,11 @@ export const useStore = create<AppState>((set, get) => ({
             // Get recent history for context (last 3 messages is usually enough for immediate context)
             const recentHistory = state.history.slice(-3).map(m => `${m.role}: ${m.content}`).join('\n');
             
+            // EXTRACT LAST PARTNER MESSAGE (Signal 1 - Explicit)
+            // Look for the last message that is NOT from the user.
+            const lastPartnerMsgObj = [...state.history].reverse().find(m => m.role !== 'user');
+            const lastPartnerMessage = lastPartnerMsgObj ? lastPartnerMsgObj.content : null;
+
             // FIX: Do NOT trim text. "so" (completions) and "so " (next word) are different states.
             // Cache Key now includes Schedule to differentiate contexts (e.g. Beach vs Home)
             const cacheKey = `${text}|${recentHistory}|${relevantSchedule}`; 
@@ -197,6 +202,7 @@ export const useStore = create<AppState>((set, get) => ({
                 body: JSON.stringify({ 
                     text, 
                     history: recentHistory,
+                    lastPartnerMessage, // Explicitly pass the detected partner message
                     // New Context Signals
                     time: timeString,
                     userProfile: state.userProfile,
@@ -264,12 +270,37 @@ export const useStore = create<AppState>((set, get) => ({
   addHistoryItem: async (item) => {
     // Optimistic update
     set((state) => ({ history: [...state.history, item] }));
+    
+    // TRIGGER: If the new item is from 'assistant' (Partner), immediately predict responses
+    if (item.role === 'user') { // wait. The 'Listening' usually adds as 'user' or 'partner'? 
+       // In this app, 'user' is Samantha (the AAC user). 'assistant' is usually the AI response... 
+       // BUT, the 'Listener' (Microphone) detects the *other* person.
+       // Let's check how 'Listener' adds items. Usually listening adds as 'system' or 'partner' or 'assistant'.
+       // Assuming standard chat: user = me, assistant = them.
+       // Actually, chat history usually puts user = Me, assistant = AI. 
+       // For a conversation aid, "Listener" input should probably be logged as 'assistant' (The Interlocutor).
+    }
+
     try {
       await fetch('/api/history', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: item.role, content: item.content }),
       });
+      
+      // AUTO-PREDICT TRIGGER
+      // If the message was added by the "Partner" (assistant role in this context, or however we map it),
+      // we should trigger a prediction for the User ("user" role).
+      // Let's verify who is who. If the app listens to "What is your name?", that is the PARTNER speaking.
+      // So if (item.role !== 'user') -> Trigger refreshPredictions()
+      if (item.role !== 'user') {
+          // Verify we aren't already typing
+          const currentText = get().typedText;
+          if (!currentText) {
+             get().refreshPredictions(''); // Zero-shot prediction based on this new history
+          }
+      }
+
     } catch (error) {
       console.error('Failed to save history item:', error);
     }

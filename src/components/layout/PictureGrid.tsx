@@ -426,6 +426,8 @@ export default function PictureGrid({ onSelect }: PictureGridProps) {
             onClick={() => setPictureCategory(cat.id)} 
           />
         ))}
+        {/* Spacer to push Add Word to the corner (11th col) */}
+        <div className="w-full aspect-square" />
         <Tile 
           label="Add Word" 
           icon={Plus} 
@@ -446,7 +448,14 @@ export default function PictureGrid({ onSelect }: PictureGridProps) {
               className="w-full bg-slate-800 text-white placeholder-slate-500 rounded-xl px-4 py-3 mb-4 focus:ring-2 focus:ring-sky-500 outline-none border border-slate-700"
               placeholder="Type a word (e.g. Banana)"
               value={newWord}
-              onChange={(e) => setNewWord(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                // Title Case each word (e.g. "red apple" -> "Red Apple")
+                const formatted = val.split(' ').map(word => 
+                    word.length > 0 ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() : ''
+                ).join(' ');
+                setNewWord(formatted);
+              }}
               onKeyDown={(e) => e.key === 'Enter' && handleCreateWord()}
             />
             
@@ -469,7 +478,7 @@ export default function PictureGrid({ onSelect }: PictureGridProps) {
                     <span>Creating...</span>
                   </>
                 ) : (
-                  <span>Create Magic</span>
+                  <span>Create Icon</span>
                 )}
               </button>
             </div>

@@ -42,7 +42,8 @@ export default function Cockpit() {
     } else if (key === 'SPACE') {
       setTypedText(typedText + ' ');
     } else {
-      setTypedText(typedText + key);
+      // Force lowercase
+      setTypedText(typedText + key.toLowerCase());
     }
   };
 
@@ -110,15 +111,15 @@ export default function Cockpit() {
   const DEFAULTS: SuggestionResponse[] = [
     { id: 'd1', label: 'Yes', text: 'Yes', type: 'prediction' },
     { id: 'd2', label: 'No', text: 'No', type: 'prediction' },
-    { id: 'd3', label: 'Thanks', text: 'Thanks', type: 'prediction' },
-    { id: 'd4', label: 'Help', text: 'Help', type: 'prediction' }
+    { id: 'd3', label: 'Help', text: 'Help', type: 'prediction' },
+    { id: 'd4', label: 'Thanks', text: 'Thanks', type: 'prediction' }
   ];
 
   // Logic update: Trust the store's suggestions (which now come from Grammar Engine).
-  // Only fallback to DEFAULTS if store is completely empty.
-  const wordSuggestions = suggestions.length > 0 
-    ? suggestions.slice(0, 4)
-    : DEFAULTS;
+  // If no text is typed, ALWAYS show the critical defaults.
+  const wordSuggestions = !typedText
+    ? DEFAULTS
+    : suggestions.slice(0, 4);
 
   return (
     <div className="flex-1 h-full flex flex-col bg-slate-900 text-slate-100 font-sans overflow-hidden">
@@ -215,18 +216,21 @@ export default function Cockpit() {
                   onClick={(e) => {
                     reinforceHabit(sug.label);
                     // Smart completion: Replace last word if it matches prefix
+                    // Force lowercase for suggestions too
+                    const label = sug.label.toLowerCase(); 
+                    
                     if (!typedText) {
-                      setTypedText(sug.label);
+                      setTypedText(label + ' ');
                     } else {
                       const words = typedText.split(' ');
                       const lastWord = words[words.length - 1];
-                      if (lastWord && sug.label.toLowerCase().startsWith(lastWord.toLowerCase())) {
-                        words[words.length - 1] = sug.label;
-                        setTypedText(words.join(' '));
+                      if (lastWord && label.startsWith(lastWord.toLowerCase())) {
+                         words[words.length - 1] = label;
+                         setTypedText(words.join(' ') + ' ');
                       } else {
-                        // Concatenate if it's a new word (handling potential double spaces via trim request? No, JS splits handle empty string for spaces)
-                        // If typedText ends in space, lastWord is empty, startsWith is true, so it replaces empty with label -> correct space handling
-                        setTypedText(typedText + (typedText.endsWith(' ') ? '' : ' ') + sug.label);
+                         // Add space BEFORE if needed, and ALWAYS add space AFTER
+                         const prefix = typedText.endsWith(' ') ? '' : ' ';
+                         setTypedText(typedText + prefix + label + ' ');
                       }
                     }
                   }}

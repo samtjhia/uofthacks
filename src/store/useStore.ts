@@ -4,6 +4,39 @@ import { getGrammarSuggestions } from '@/lib/grammar';
 
 let debounceTimer: ReturnType<typeof setTimeout>;
 
+// Simple LRU Cache for Predictions
+let predictionCache = new Map<string, SuggestionResponse[]>();
+const MAX_CACHE_SIZE = 50;
+const PREDICTION_DEBOUNCE_MS = 300; // Fast response
+const CACHE_KEY_STORAGE = 'gemini_prediction_cache';
+
+// Load cache from localStorage (client-side only)
+if (typeof window !== 'undefined') {
+  try {
+    const saved = localStorage.getItem(CACHE_KEY_STORAGE);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      predictionCache = new Map(parsed);
+      console.log(`🧠 Loaded ${predictionCache.size} cached predictions from disk.`);
+    }
+  } catch (e) {
+    console.error("Failed to load prediction cache", e);
+  }
+}
+
+// Helper to save cache
+const saveCacheToDisk = () => {
+  if (typeof window !== 'undefined') {
+    try {
+      // Convert Map to Array for JSON stringify
+      const array = Array.from(predictionCache.entries());
+      localStorage.setItem(CACHE_KEY_STORAGE, JSON.stringify(array));
+    } catch (e) {
+      console.error("Failed to save prediction cache", e);
+    }
+  }
+};
+
 export interface AppState {
   // UI State
   isListening: boolean;
@@ -48,12 +81,8 @@ export interface AppState {
   reinforceHabit: (text: string) => Promise<void>;
 }
 
-// MOCK DATA
-const MOCK_SUGGESTIONS: SuggestionResponse[] = [
-  { id: 's1', label: 'Pizza', text: 'I would like a slice of pizza', type: 'prediction' },
-  { id: 's2', label: 'Pasta', text: 'Some pasta would be nice', type: 'prediction' },
-  { id: 's3', label: 'Water', text: 'Can I have some water?', type: 'prediction' },
-];
+// MOCK DATA (Empty initially to trigger Defaults)
+const MOCK_SUGGESTIONS: SuggestionResponse[] = [];
 
 export const useStore = create<AppState>((set, get) => ({
   isListening: false,
@@ -88,16 +117,25 @@ export const useStore = create<AppState>((set, get) => ({
         set({ suggestions: [] });
     }
 
-    // 2. Level 2: Gemini Brain (Debounced 500ms)
+    // 2. Level 2: Gemini Brain (Debounced)
     // Provides context-aware deep predictions
     if (debounceTimer) clearTimeout(debounceTimer);
 
     if (text.trim().length > 0) {
       debounceTimer = setTimeout(async () => {
         try {
-            // Get recent history for context (last 5 messages)
-            const recentHistory = get().history.slice(-5).map(m => `${m.role}: ${m.content}`).join('\n');
-            
+            // Get recent history for context (last 3 messages is usually enough for immediate context)
+            const recentHistory = get().history.slice(-3).map(m => `${m.role}: ${m.content}`).join('\n');
+            const cacheKey = `${text.trim()}|${recentHistory}`; // Cache based on input + context
+
+            // CHECK CACHE FIRST
+            if (predictionCache.has(cacheKey)) {
+                 console.log("Using cached prediction for:", text);
+                 set({ suggestions: predictionCache.get(cacheKey)! });
+                 return;
+            }
+
+            console.log("⚡ Fetching new prediction from API for:", text);
             const response = await fetch('/api/predict', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -110,17 +148,23 @@ export const useStore = create<AppState>((set, get) => ({
             if (response.ok) {
                 const data = await response.json();
                 if (data.suggestions && Array.isArray(data.suggestions)) {
-                    // Start of Hybrid Merging Strategy
-                    // If Gemini returns fewer than 4, fill with grammar?
-                    // For now, let Gemini take the wheel if it returns valid results.
+                    // Update Store
                     set({ suggestions: data.suggestions });
+                    
+                    // Update Cache
+                    if (predictionCache.size >= MAX_CACHE_SIZE) {
+                        const firstKey = predictionCache.keys().next().value;
+                        if (firstKey) predictionCache.delete(firstKey);
+                    }
+                    predictionCache.set(cacheKey, data.suggestions);
+                    saveCacheToDisk(); // Persist to localStorage
                 }
             }
         } catch (error) {
             console.error("Gemini Prediction Failed:", error);
             // Fail silently, keeping the Grammar suggestions
         }
-      }, 300); // 300ms debounce
+      }, PREDICTION_DEBOUNCE_MS);
     }
   },
   

@@ -72,52 +72,67 @@ const BIGRAM_OVERRIDES: Record<string, string[]> = {
 };
 
 export function getGrammarSuggestions(currentText: string): SuggestionResponse[] {
-  const words = currentText.trim().split(/\s+/);
-  const lastWord = words.length > 0 ? words[words.length - 1].toLowerCase() : "";
+  // Signal 6: The Filter (Spelling Constraint)
+  if (!currentText) return [];
 
-  // 1. Check Bigram Overrides first (Special common pairs)
-  if (BIGRAM_OVERRIDES[lastWord]) {
-    return BIGRAM_OVERRIDES[lastWord].map((word, idx) => ({
-      id: `g-${lastWord}-${idx}`,
-      label: word,
-      text: word,
-      type: 'prediction'
-    }));
+  const endsWithSpace = currentText.endsWith(' ');
+  const words = currentText.trim().split(/\s+/);
+  
+  let contextWord = ""; // The word determining grammar (e.g. "want")
+  let filterPrefix = ""; // The partial typing (e.g. "p")
+
+  if (endsWithSpace) {
+      // User finished a word, waiting for next
+      contextWord = words[words.length - 1].toLowerCase();
+      filterPrefix = "";
+  } else {
+      // User is typing a word
+      filterPrefix = words[words.length - 1].toLowerCase();
+      contextWord = words.length > 1 ? words[words.length - 2].toLowerCase() : "";
   }
 
-  // 2. Check POS Rules
-  const targetCategories = GRAMMAR_RULES[lastWord];
-  
-  if (targetCategories) {
-    let candidates: string[] = [];
+  // Collect all possible candidates based on context
+  let candidates: string[] = [];
+
+  // 1. Check Bigram Overrides for Context
+  if (contextWord && BIGRAM_OVERRIDES[contextWord]) {
+    candidates = BIGRAM_OVERRIDES[contextWord];
+  } 
+  // 2. Check POS Rules for Context
+  else if (contextWord && GRAMMAR_RULES[contextWord]) {
+    const targetCategories = GRAMMAR_RULES[contextWord];
     if (targetCategories.includes('verb')) candidates.push(...WORD_BANK.verbs);
     if (targetCategories.includes('noun')) candidates.push(...WORD_BANK.nouns);
     if (targetCategories.includes('adjective')) candidates.push(...WORD_BANK.adjectives);
-    
-    // Shuffle or select top 4
-    return candidates.slice(0, 4).map((word, idx) => ({
-      id: `g-pos-${idx}`,
-      label: word,
-      text: word,
-      type: 'prediction'
-    }));
+    if (targetCategories.includes('pronoun')) candidates.push(...WORD_BANK.pronouns); // Added pronouns
+  }
+  // 3. No Context? Use everything
+  else {
+    candidates = [
+      ...WORD_BANK.verbs,
+      ...WORD_BANK.nouns,
+      ...WORD_BANK.adjectives,
+      ...WORD_BANK.pronouns,
+      ...WORD_BANK.conjunctions,
+      ...WORD_BANK.prepositions
+    ];
   }
 
-  // 3. Fallback / Start of Sentence
-  if (currentText.trim() === "") {
-     // Return empty array to signal Cockpit to use DEFAULTS (Yes, No, Help...)
-     return [];
+  // 4. APPLY SIGNAL 6: Prefix Filter
+  // If we have a filter, only show matches
+  if (filterPrefix) {
+      candidates = candidates.filter(w => w.toLowerCase().startsWith(filterPrefix));
   }
 
-  // 4. Generic Fallback (Context unknown) -> Mix of common connectors and nouns
-  return [
-    ...WORD_BANK.conjunctions.slice(0, 1),
-    ...WORD_BANK.prepositions.slice(0, 1),
-    ...WORD_BANK.nouns.slice(0, 2)
-  ].map((word, idx) => ({
-      id: `g-fallback-${idx}`,
-      label: word,
-      text: word,
+  // 5. Deduplicate and return top 4
+  const uniqueCandidates = Array.from(new Set(candidates));
+  
+  if (uniqueCandidates.length === 0) return [];
+
+  return uniqueCandidates.slice(0, 4).map((word, idx) => ({
+      id: `g-filter-${idx}`,
+      label: word.toLowerCase(),
+      text: word.toLowerCase(),
       type: 'prediction'
-    }));
+  }));
 }

@@ -11,7 +11,7 @@ import { TimePicker } from './TimePicker';
 import { speakText } from '@/lib/elevenlabs';
 
 export default function Cockpit() {
-  const { isListening, inputMode, setInputMode, typedText, setTypedText, suggestions, addHistoryItem, reinforceHabit, schedulerAddingToBlock, setSchedulerAddingToBlock, addScheduleItem } = useStore();
+  const { isListening, inputMode, setInputMode, typedText, setTypedText, isPredicting, suggestions, addHistoryItem, reinforceHabit, schedulerAddingToBlock, setSchedulerAddingToBlock, addScheduleItem } = useStore();
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [pendingLabel, setPendingLabel] = useState('');
 
@@ -210,7 +210,16 @@ export default function Cockpit() {
       {(inputMode === 'text' || schedulerAddingToBlock) && (
         <div className="shrink-0 px-6 pb-4">
             <div className="flex gap-3 h-14 overflow-x-auto scrollbar-hide">
-              {wordSuggestions.length > 0 ? wordSuggestions.map((sug) => (
+              {isPredicting && (typedText && typedText.trim() !== '') ? (
+                  // LOADING SKELETONS (Only show when typing and waiting for specific predictions)
+                  // If empty input, we show defaults instantly, so no skeleton needed there unless we want to simulate even zero-shot loading
+                  [1, 2, 3, 4].map((i) => (
+                      <div key={i} className="flex-1 min-w-[120px] px-6 h-full rounded-2xl bg-slate-800 border border-slate-700/50 flex items-center justify-center animate-pulse">
+                          <div className="h-2 w-16 bg-slate-700 rounded-full" />
+                      </div>
+                  ))
+              ) : (
+              wordSuggestions.length > 0 ? wordSuggestions.map((sug) => (
                 <button 
                   key={sug.id}
                   onClick={(e) => {
@@ -242,7 +251,7 @@ export default function Cockpit() {
                  <div className="w-full flex items-center justify-center h-full text-slate-600 text-sm italic border border-dashed border-slate-800 rounded-2xl">
                     Thinking of suggestions...
                  </div>
-              )}
+              ))}
             </div>
         </div>
       )}

@@ -60,6 +60,7 @@ export interface AppState {
   // Data State
   typedText: string;
   setTypedText: (text: string) => void;
+  isPredicting: boolean; // Loading state for AI
   history: ChatMessage[];
   suggestions: SuggestionResponse[];
   habits: string[]; // Signal 4: Top frequency words
@@ -94,6 +95,7 @@ const MOCK_SUGGESTIONS: SuggestionResponse[] = [];
 
 export const useStore = create<AppState>((set, get) => ({
   isListening: false,
+  isPredicting: false,
   toggleListening: () => set((state) => ({ isListening: !state.isListening })),
   
   isLeftSidebarOpen: true,
@@ -140,6 +142,10 @@ export const useStore = create<AppState>((set, get) => ({
   // EXPOSED PREDICTION FUNCTION (For Manual Triggering)
   refreshPredictions: async (textOverride?: string) => {
         const text = textOverride !== undefined ? textOverride : get().typedText;
+        
+        // Start Loading State
+        set({ isPredicting: true });
+
         try {
             get().addEngineLog(`⏳ Engine Activated. Reason: ${text ? 'Typing' : 'Zero-Shot Context'}...`, 'info');
             const state = get();
@@ -161,6 +167,7 @@ export const useStore = create<AppState>((set, get) => ({
                  // console.log("Using cached prediction for:", text);
                  get().addEngineLog(`⚡ Cache HIT. (Size: ${predictionCache.size}/${MAX_CACHE_SIZE})`, 'success');
                  set({ suggestions: predictionCache.get(cacheKey)! });
+                 set({ isPredicting: false }); // Done (Cache Hit)
                  return;
             }
 
@@ -216,6 +223,8 @@ export const useStore = create<AppState>((set, get) => ({
             console.error("Gemini Prediction Failed:", error);
             get().addEngineLog(`❌ Engine Error: ${error}`, 'error');
             // Fail silently, keeping the Grammar suggestions
+        } finally {
+            set({ isPredicting: false }); // Done (Fetch or Error)
         }
   },
   

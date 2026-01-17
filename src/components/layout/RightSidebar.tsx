@@ -4,7 +4,7 @@ import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { Mic, MicOff, Smile, Frown, Meh, Heart, MessageCircle } from 'lucide-react';
 
 export default function RightSidebar() {
-  const { isListening, toggleListening, suggestions, setTypedText, addHistoryItem, isAutoMode, toggleAutoMode, fetchSuggestions, fetchSchedule, reinforceHabit, refreshPredictions } = useStore();
+  const { isListening, toggleListening, suggestions, isPredicting, setTypedText, addHistoryItem, isAutoMode, toggleAutoMode, fetchSuggestions, fetchSchedule, reinforceHabit, refreshPredictions } = useStore();
   
   React.useEffect(() => {
     // 1. Initialize Signals (Silently)
@@ -136,7 +136,17 @@ export default function RightSidebar() {
         </div>
         
         <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-          {suggestions.map((sug, idx) => (
+          {isPredicting ? (
+             // LOADING SKELETONS
+             [1, 2, 3, 4].map(i => (
+                 <div key={i} className="w-full p-4 rounded-2xl bg-white/5 border border-white/5 relative overflow-hidden">
+                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-[shimmer_1.5s_infinite]" />
+                     <div className="h-4 bg-slate-700/50 rounded-full w-3/4 mb-2" />
+                     <div className="h-3 bg-slate-700/30 rounded-full w-1/2" />
+                 </div>
+             ))
+          ) : (
+          suggestions.map((sug, idx) => (
              <button
                key={sug.id}
                onClick={(e) => { 
@@ -155,7 +165,7 @@ export default function RightSidebar() {
                  </div>
                </div>
              </button>
-          ))}
+          )))}
         </div>
       </div>
 

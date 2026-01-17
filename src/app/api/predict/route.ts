@@ -53,9 +53,9 @@ export async function POST(req: NextRequest) {
       # The 5 Signals (Hierarchy of Importance):
       1. **Signal 6 [The Filter]**: HARD CONSTRAINT. Predictions MUST start with the user's current input: "${text}". 
          - **EXCEPTION**: If input is EMPTY, predict 4 distinct conversation starters based on Schedule/History/Time.
-      2. **Signal 4 [The Habits]**: High Priority. Users repeat themselves. If a frequent habit matches the input/context, it wins.
-      3. **Signal 2 [The Scheduler]**: Context Booster. If the schedule says "Art Class", boost words like "paint", "color", "canvas".
-      4. **Signal 1 [The Listener]**: Conversation Continuity. If the last message was a question, suggest an answer.
+      2. **Signal 1 [The Listener]**: CRITICAL PRIORITY. Conversation Continuity. If the last message was a question, suggesting a direct answer is the top priority.
+      3. **Signal 4 [The Habits]**: High Priority. Users repeat themselves. If a frequent habit matches the input/context, it wins.
+      4. **Signal 2 [The Scheduler]**: Context Booster. If the schedule says "Art Class", boost words like "paint", "color", "canvas".
       5. **Signal 5 [The Grammar]**: Syntactic Validity. Ensure the sentence makes grammatical sense.
 
       # Current State Signals
@@ -70,11 +70,11 @@ export async function POST(req: NextRequest) {
       "${text}"
 
       # Prediction Algorithm (Execute Step-by-Step):
-      1. **Analyze Schedule**: Extract 3-5 keywords related to the current "${schedule}" context. (Mental Scratchpad).
-      2. **Filter Habits**: Check if any provided habits match the current input "${text}". (Or if empty input, suggest top habits).
-      3. **Check History**: Does the last message require a specific response type (Yes/No, Location, Time)?
+      1. **Check History (Signal 1)**: IMMEDIATELY analyze the last incoming message. Does it demand a response (Who/What/Where/When)? If yes, prioritize answers in the predictions.
+      2. **Analyze Schedule**: Extract keywords related to the current "${schedule}" context.
+      3. **Filter Habits**: Check if any provided habits match the current input "${text}".
       4. **Synthesize**: Generate 4 predictions that satisfy the Filter Constraint ("${text}...") and maximize Context Relevance.
-         - *Conflict Rule*: If a word fits the Schedule Context (e.g., input "b" -> "brush" in Art Class), it beats a generic word (e.g., "but"), unless "but" is syntactically required.
+         - *Conflict Rule*: If History demands an answer (e.g., "Do you want water?"), predict "Yes"/"No" or relevant answers BEFORE schedule/habit suggestions.
       
       # Output Format
       Return a SINGLE JSON object. No markdown.

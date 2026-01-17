@@ -4,7 +4,25 @@ import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { Mic, MicOff, Smile, Frown, Meh, Heart, MessageCircle } from 'lucide-react';
 
 export default function RightSidebar() {
-  const { isListening, toggleListening, suggestions, setTypedText, addHistoryItem, isAutoMode, toggleAutoMode } = useStore();
+  const { isListening, toggleListening, suggestions, isPredicting, setTypedText, addHistoryItem, isAutoMode, toggleAutoMode, fetchSuggestions, fetchSchedule, reinforceHabit, refreshPredictions } = useStore();
+  
+  React.useEffect(() => {
+    // 1. Initialize Signals (Silently)
+    // We want Habit data and Schedule data loaded in the store, 
+    // BUT we don't want "dumb" frequency list to overwrite the UI.
+    const initSignals = async () => {
+        await Promise.all([
+            fetchSchedule(), 
+            fetchSuggestions(true) // true = load signals only, do not set UI suggestions
+        ]);
+        
+        // 2. Trigger the "Brain" (Smart Engine)
+        // Now that signals are loaded, ask Gemini to predict based on Schedule+Habits
+        refreshPredictions('');
+    };
+    
+    initSignals();
+  }, [fetchSuggestions, fetchSchedule, refreshPredictions]);
   
   // Use a ref to track if we should auto-restart to avoid closure staleness
   const autoModeRef = React.useRef(isAutoMode);
@@ -117,26 +135,37 @@ export default function RightSidebar() {
             </h2>
         </div>
         
-        <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-700/50 scrollbar-track-transparent">
-          {suggestions.map((sug, idx) => (
+        <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+          {isPredicting ? (
+             // LOADING SKELETONS
+             [1, 2, 3, 4].map(i => (
+                 <div key={i} className="w-full p-4 rounded-2xl bg-white/5 border border-white/5 relative overflow-hidden">
+                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-[shimmer_1.5s_infinite]" />
+                     <div className="h-4 bg-slate-700/50 rounded-full w-3/4 mb-2" />
+                     <div className="h-3 bg-slate-700/30 rounded-full w-1/2" />
+                 </div>
+             ))
+          ) : (
+          suggestions.map((sug, idx) => (
              <button
                key={sug.id}
-               onClick={(e) => { e.currentTarget.blur(); setTypedText(sug.text); }}
+               onClick={(e) => { 
+                reinforceHabit(sug.text);
+                setTypedText(sug.text);
+                e.currentTarget.blur();
+               }}
                className="w-full text-left p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 transition-all group relative overflow-hidden"
              >
                 {/* Subtle highlight effect on hover */}
                 <div className="absolute inset-0 bg-gradient-to-r from-sky-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                
-               <div className="relative z-10">
-                 <div className="font-semibold text-sm text-slate-200 mb-1 group-hover:text-sky-300 transition-colors">
-                   {sug.label}
-                 </div>
-                 <div className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
-                   "{sug.text}"
+               <div className="relative z-10 p-1">
+                 <div className="font-medium text-[15px] leading-snug text-slate-200 group-hover:text-sky-300 transition-colors">
+                   {sug.text}
                  </div>
                </div>
              </button>
-          ))}
+          )))}
         </div>
       </div>
 

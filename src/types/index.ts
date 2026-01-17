@@ -34,3 +34,14 @@ export interface UserProfile {
     inputSpeed: number; // For analytics
   };
 }
+
+// 4. SCHEDULER
+export interface ScheduleItem {
+  _id: string;
+  label: string;
+  timeBlock: 'morning' | 'afternoon' | 'evening';
+  order: number;
+  startTime?: string; // "HH:MM"
+  endTime?: string;   // "HH:MM"
+  durationMinutes?: number;
+}

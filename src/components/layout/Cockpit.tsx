@@ -1,14 +1,19 @@
 "use client";
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useStore } from '@/store/useStore';
-import { Activity, Volume2, X, Delete } from 'lucide-react';
+import { SuggestionResponse } from '@/types';
+import { Activity, Volume2, X, Delete, Plus, Check } from 'lucide-react';
 import VirtualKeyboard from './VirtualKeyboard';
 import PictureGrid from './PictureGrid';
+import SchedulerView from './SchedulerView';
 import WaveformVisualizer from '../ui/WaveformVisualizer';
+import { TimePicker } from './TimePicker';
 import { speakText } from '@/lib/elevenlabs';
 
 export default function Cockpit() {
-  const { isListening, inputMode, setInputMode, typedText, setTypedText, suggestions, addHistoryItem } = useStore();
+  const { isListening, inputMode, setInputMode, typedText, setTypedText, isPredicting, suggestions, addHistoryItem, reinforceHabit, schedulerAddingToBlock, setSchedulerAddingToBlock, addScheduleItem } = useStore();
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [pendingLabel, setPendingLabel] = useState('');
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -37,7 +42,8 @@ export default function Cockpit() {
     } else if (key === 'SPACE') {
       setTypedText(typedText + ' ');
     } else {
-      setTypedText(typedText + key);
+      // Force lowercase
+      setTypedText(typedText + key.toLowerCase());
     }
   };
 
@@ -47,9 +53,18 @@ export default function Cockpit() {
   
   const handleSpeak = async () => {
     if (!typedText) return;
+
+    if (schedulerAddingToBlock) {
+      // Instead of adding immediately, open Time Picker
+      setPendingLabel(typedText);
+      setShowTimePicker(true);
+      return;
+    }
+
     console.log('Speaking:', typedText);
     const ok = await speakText(typedText);
     if (ok) {
+      reinforceHabit(typedText);
       addHistoryItem({
         id: Date.now().toString(),
         role: 'user',
@@ -61,7 +76,31 @@ export default function Cockpit() {
     }
   };
 
+  const handleTimeConfirm = async (time: string, duration: number) => {
+    if (schedulerAddingToBlock && pendingLabel) {
+      await addScheduleItem(pendingLabel, schedulerAddingToBlock, time, duration);
+      setTypedText('');
+      setPendingLabel('');
+      setSchedulerAddingToBlock(null);
+      setShowTimePicker(false);
+    }
+  };
+
+  const getInitialTimeForBlock = () => {
+    switch (schedulerAddingToBlock) {
+      case 'morning': return '08:00';
+      case 'afternoon': return '12:00';
+      case 'evening': return '18:00';
+      default: return '12:00';
+    }
+  };
+
   const handleClear = () => {
+    if (schedulerAddingToBlock) {
+      setSchedulerAddingToBlock(null);
+      setTypedText('');
+      return;
+    }
     setTypedText('');
   };
 
@@ -80,7 +119,18 @@ export default function Cockpit() {
     }
   };
 
-  const wordSuggestions = suggestions.slice(0, 4);
+  const DEFAULTS: SuggestionResponse[] = [
+    { id: 'd1', label: 'Yes', text: 'Yes', type: 'prediction' },
+    { id: 'd2', label: 'No', text: 'No', type: 'prediction' },
+    { id: 'd3', label: 'Hi', text: 'Hi', type: 'prediction' },
+    { id: 'd4', label: 'Thanks', text: 'Thanks', type: 'prediction' }
+  ];
+
+  // Logic update: Trust the store's suggestions (which now come from Grammar and Gemini).
+  // CRITICAL: User requirement - If input is empty (or just whitespace), ALWAYS show defaults in bubbles.
+  const wordSuggestions = (!typedText || typedText.trim() === '')
+    ? DEFAULTS
+    : suggestions.slice(0, 4);
 
   return (
     <div className="flex-1 h-full flex flex-col bg-slate-900 text-slate-100 font-sans overflow-hidden">
@@ -100,7 +150,7 @@ export default function Cockpit() {
 
         {/* MODE TOGGLES */}
         <div className="h-12 bg-slate-800/50 p-1 rounded-2xl flex items-center shrink-0 border border-white/5 backdrop-blur-sm">
-            {(['text', 'picture', 'spark'] as const).map((mode) => (
+            {(['text', 'picture', 'spark', 'schedule'] as const).map((mode) => (
                 <button 
                   key={mode}
                   onClick={() => setInputMode(mode)}
@@ -117,6 +167,7 @@ export default function Cockpit() {
       </div>
 
       {/* MIDDLE ROW (Input) */}
+      {(inputMode !== 'schedule' || schedulerAddingToBlock) && (
       <div className="shrink-0 px-6 pb-4 flex items-stretch gap-3">
         {/* INPUT BAR + CLEAR */}
         <div className="flex-1 h-16 bg-slate-800/50 backdrop-blur-md rounded-2xl px-5 flex items-center shadow-lg border border-white/5 focus-within:bg-slate-800/80 transition-all relative group">
@@ -136,8 +187,8 @@ export default function Cockpit() {
               </span>
             </div>
             
-            {/* Clear Button - Only visible if text exists */}
-            {typedText.length > 0 && (
+            {/* Clear Button - Only visible if text exists OR editing schedule */}
+            {(typedText.length > 0 || schedulerAddingToBlock) && (
                 <button 
                     onClick={handleClear}
                     className="absolute right-4 p-1.5 text-slate-500 hover:text-white rounded-full hover:bg-slate-600/50 transition-colors"
@@ -158,25 +209,60 @@ export default function Cockpit() {
                 <Delete className="w-6 h-6" />
             </button>
             
-            {/* Speak - Blue/Cyan Gradient */}
+            {/* Speak - Blue/Cyan Gradient OR Confirm Add */}
             <button 
                 onClick={handleSpeak}
-                className="w-20 h-16 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-lg shadow-blue-900/30 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center"
-                aria-label="Speak"
+                className={`w-20 h-16 rounded-2xl text-white shadow-lg transition-all flex items-center justify-center ${
+                  schedulerAddingToBlock
+                    ? 'bg-gradient-to-br from-green-500 to-emerald-600 shadow-green-900/30'
+                    : 'bg-gradient-to-br from-sky-500 to-blue-600 shadow-blue-900/30'
+                } hover:brightness-110 active:scale-95`}
+                aria-label={schedulerAddingToBlock ? "Confirm Add" : "Speak"}
             >
-                <Volume2 className="w-7 h-7" />
+                {schedulerAddingToBlock ? <Check className="w-8 h-8" /> : <Volume2 className="w-7 h-7" />}
+
             </button>
         </div>
       </div>
+      )}
 
       {/* BOTTOM ROW (Suggestions) */}
-      {inputMode === 'text' && (
+      {(inputMode === 'text' || schedulerAddingToBlock) && (
         <div className="shrink-0 px-6 pb-4">
             <div className="flex gap-3 h-14 overflow-x-auto scrollbar-hide">
-              {wordSuggestions.length > 0 ? wordSuggestions.map((sug) => (
+              {isPredicting && (typedText && typedText.trim() !== '') ? (
+                  // LOADING SKELETONS (Only show when typing and waiting for specific predictions)
+                  // If empty input, we show defaults instantly, so no skeleton needed there unless we want to simulate even zero-shot loading
+                  [1, 2, 3, 4].map((i) => (
+                      <div key={i} className="flex-1 min-w-[120px] px-6 h-full rounded-2xl bg-slate-800 border border-slate-700/50 flex items-center justify-center animate-pulse">
+                          <div className="h-2 w-16 bg-slate-700 rounded-full" />
+                      </div>
+                  ))
+              ) : (
+              wordSuggestions.length > 0 ? wordSuggestions.map((sug) => (
                 <button 
                   key={sug.id}
-                  onClick={() => setTypedText(typedText + " " + sug.label)}
+                  onClick={(e) => {
+                    reinforceHabit(sug.label);
+                    // Smart completion: Replace last word if it matches prefix
+                    // Force lowercase for suggestions too
+                    const label = sug.label.toLowerCase(); 
+                    
+                    if (!typedText) {
+                      setTypedText(label + ' ');
+                    } else {
+                      const words = typedText.split(' ');
+                      const lastWord = words[words.length - 1];
+                      if (lastWord && label.startsWith(lastWord.toLowerCase())) {
+                         words[words.length - 1] = label;
+                         setTypedText(words.join(' ') + ' ');
+                      } else {
+                         // Add space BEFORE if needed, and ALWAYS add space AFTER
+                         const prefix = typedText.endsWith(' ') ? '' : ' ';
+                         setTypedText(typedText + prefix + label + ' ');
+                      }
+                    }
+                  }}
                   className="flex-1 min-w-[120px] px-6 h-full rounded-2xl bg-slate-800 border border-sky-500/30 text-sky-400 text-lg font-medium hover:bg-slate-700 hover:text-sky-300 hover:border-sky-400/50 transition-all shadow-sm active:scale-95 whitespace-nowrap"
                 >
                   {sug.label}
@@ -185,7 +271,7 @@ export default function Cockpit() {
                  <div className="w-full flex items-center justify-center h-full text-slate-600 text-sm italic border border-dashed border-slate-800 rounded-2xl">
                     Thinking of suggestions...
                  </div>
-              )}
+              ))}
             </div>
         </div>
       )}
@@ -197,11 +283,24 @@ export default function Cockpit() {
                 style={{backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '24px 24px'}} />
            
            <div className="flex-1 overflow-hidden p-2 sm:p-4 z-10 w-full h-full relative">
-              {inputMode === 'text' ? (
-                <VirtualKeyboard onKeyPress={handleKeyPress} />
+              {(inputMode === 'text' || schedulerAddingToBlock) ? (
+                <div className="w-full h-full flex flex-col">
+                    {/* Optional: Add Indicator Header */}
+                    {schedulerAddingToBlock && (
+                      <div className="mb-2 px-2 flex items-center gap-2 text-green-400 animate-in fade-in slide-in-from-top-2">
+                         <Plus className="w-4 h-4" />
+                         <span className="font-bold text-sm uppercase tracking-wider">Adding to {schedulerAddingToBlock}</span>
+                      </div>
+                    )}
+                    <VirtualKeyboard onKeyPress={handleKeyPress} />
+                </div>
               ) : inputMode === 'picture' ? (
                 <div className="h-full w-full flex flex-col">
                      <PictureGrid onSelect={handlePictureSelect} />
+                </div>
+              ) : inputMode === 'schedule' ? (
+                <div className="h-full w-full flex flex-col">
+                     <SchedulerView />
                 </div>
               ) : (
                 <div className="h-full w-full flex flex-col items-center justify-center text-slate-500 gap-4">
@@ -216,6 +315,14 @@ export default function Cockpit() {
               )}
            </div>
       </div>
+      {showTimePicker && (
+        <TimePicker 
+          initialTime={getInitialTimeForBlock()}
+          initialDuration={30}
+          onConfirm={handleTimeConfirm}
+          onCancel={() => setShowTimePicker(false)}
+        />
+      )}
     </div>
   );
 }

@@ -35,3 +35,22 @@ const MessageSchema = new Schema<IMessage>({
 });
 
 export const Message: Model<IMessage> = mongoose.models.Message || mongoose.model<IMessage>('Message', MessageSchema);
+
+
+// --- SIGNAL 2: SCHEDULER ---
+// Stores simple daily routine items.
+interface IScheduleItem {
+  label: string;
+  timeBlock: 'morning' | 'afternoon' | 'evening';
+  order: number;
+  createdAt: Date;
+}
+
+const ScheduleSchema = new Schema<IScheduleItem>({
+  label: { type: String, required: true },
+  timeBlock: { type: String, enum: ['morning', 'afternoon', 'evening'], required: true },
+  order: { type: Number, default: 0 },
+  createdAt: { type: Date, default: Date.now }
+});
+
+export const ScheduleItem: Model<IScheduleItem> = mongoose.models.ScheduleItem || mongoose.model<IScheduleItem>('ScheduleItem', ScheduleSchema);

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ChatMessage, SuggestionResponse, UserProfile } from '@/types';
+import { ChatMessage, SuggestionResponse, UserProfile, ScheduleItem } from '@/types';
 
 export interface AppState {
   // UI State
@@ -18,8 +18,8 @@ export interface AppState {
   isSpeaking: boolean;
   setIsSpeaking: (isSpeaking: boolean) => void;
 
-  inputMode: 'text' | 'picture' | 'spark';
-  setInputMode: (mode: 'text' | 'picture' | 'spark') => void;
+  inputMode: 'text' | 'picture' | 'spark' | 'schedule';
+  setInputMode: (mode: 'text' | 'picture' | 'spark' | 'schedule') => void;
   
   // Data State
   typedText: string;
@@ -27,6 +27,9 @@ export interface AppState {
   history: ChatMessage[];
   suggestions: SuggestionResponse[];
   userProfile: UserProfile | null;
+  scheduleItems: ScheduleItem[];
+  schedulerAddingToBlock: 'morning' | 'afternoon' | 'evening' | null;
+  setSchedulerAddingToBlock: (block: 'morning' | 'afternoon' | 'evening' | null) => void;
   
   // Actions
   addHistoryItem: (item: ChatMessage) => Promise<void>;
@@ -35,6 +38,9 @@ export interface AppState {
   // Async Actions
   fetchHistory: () => Promise<void>;
   fetchSuggestions: () => Promise<void>;
+  fetchSchedule: () => Promise<void>;
+  addScheduleItem: (label: string, timeBlock: 'morning' | 'afternoon' | 'evening') => Promise<void>;
+  deleteScheduleItem: (id: string) => Promise<void>;
   reinforceHabit: (text: string) => Promise<void>;
 }
 
@@ -70,6 +76,9 @@ export const useStore = create<AppState>((set, get) => ({
   history: [],
   suggestions: MOCK_SUGGESTIONS,
   userProfile: null,
+  scheduleItems: [],
+  schedulerAddingToBlock: null,
+  setSchedulerAddingToBlock: (block) => set({ schedulerAddingToBlock: block }),
   
   addHistoryItem: async (item) => {
     // Optimistic update
@@ -127,7 +136,49 @@ export const useStore = create<AppState>((set, get) => ({
       console.error('Failed to fetch suggestions:', error);
     }
   },
+fetchSchedule: async () => {
+    try {
+      const res = await fetch('/api/schedule');
+      if (res.ok) {
+        const data = await res.json();
+        set({ scheduleItems: data.items || [] });
+      }
+    } catch (error) {
+      console.error('Failed to fetch schedule:', error);
+    }
+  },
 
+  addScheduleItem: async (label, timeBlock) => {
+    try {
+      const res = await fetch('/api/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label, timeBlock }),
+      });
+      if (res.ok) {
+        // Refresh schedule
+        const current = get();
+        await current.fetchSchedule();
+      }
+    } catch (error) {
+      console.error('Failed to add schedule item:', error);
+    }
+  },
+
+  deleteScheduleItem: async (id) => {
+    try {
+      await fetch(`/api/schedule?id=${id}`, {
+        method: 'DELETE',
+      });
+      const current = get();
+      // Optimistic delete
+      set({ scheduleItems: current.scheduleItems.filter((i) => i._id !== id) });
+    } catch (error) {
+      console.error('Failed to delete schedule item:', error);
+    }
+  },
+
+  
   reinforceHabit: async (text: string) => {
     try {
       await fetch('/api/frequency', {

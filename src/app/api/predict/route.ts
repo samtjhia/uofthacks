@@ -17,7 +17,7 @@ const openai = new OpenAI({
 
 export async function POST(req: NextRequest) {
   try {
-    const { text, history, time, schedule, userProfile, habits } = await req.json();
+    const { text, history, time, schedule, userProfile, habits, mode } = await req.json();
 
     // Check Keys based on provider
     if (ACTIVE_PROVIDER === 'gemini' && !process.env.GEMINI_API_KEY) {
@@ -46,62 +46,94 @@ export async function POST(req: NextRequest) {
         }
     }
 
-    const prompt = `
-      # Role: ThoughtFlow Predictive Component (Context-Aware AAC)
-      You are an advanced predictive engine for users with speech impairments. Your job is to predict the user's *intended next word* by fusing 5 real-time context signals.
-      
-      # The 5 Signals (Hierarchy of Importance):
-      1. **Signal 6 [The Filter]**: HARD CONSTRAINT. Predictions MUST start with the user's current input: "${text}". 
-         - **EXCEPTION**: If input is EMPTY, predict 4 distinct conversation starters based on Schedule/History/Time.
-      2. **Signal 1 [The Listener]**: CRITICAL PRIORITY. Conversation Continuity. If the last message was a question, suggesting a direct answer is the top priority.
-      3. **Signal 4 [The Habits]**: High Priority. Users repeat themselves. If a frequent habit matches the input/context, it wins.
-      4. **Signal 2 [The Scheduler]**: Context Booster. If the schedule says "Art Class", boost words like "paint", "color", "canvas".
-      5. **Signal 5 [The Grammar]**: Syntactic Validity. Ensure the sentence makes grammatical sense.
+    let prompt = "";
 
-      # Current State Signals
-      ${systemContext}
-      [Signal 1 - Recent History]:
-      ${history || "None"}
-      
-      [Signal 4 - Habit Bank]:
-      ${habits && habits.length > 0 ? habits.slice(0, 50).join(', ') : "None provided"}
+    if (mode === 'spark') {
+        prompt = `
+          # Role: ThoughtFlow Spark Engine (Conversation Starters)
+          Your goal is to generate 12 engaging "Conversation Starters" based purely on the user's current context (Time, Schedule, Mood/Profile).
+          
+          # Context Signals:
+          ${systemContext}
 
-      [Signal 6 - Current Input Buffer]:
-      "${text}"
+          # Instructions:
+          - IGNORE previous chat history. We are starting a NEW topic.
+          - IGNORE any typed text. The user is asking for fresh ideas.
+          - Focus heavily on the **Schedule** and **Time**.
+          - If the schedule says "Lunch", suggest food-related openers.
+          - If the time is morning, suggest greetings.
+          - If no specific schedule, use general social openers suitable for the user's profile.
 
-      # Prediction Algorithm (Execute Step-by-Step):
-      1. **Check History (Signal 1)**: IMMEDIATELY analyze the last incoming message. Does it demand a response (Who/What/Where/When)? If yes, prioritize answers in the predictions.
-      2. **Analyze Schedule**: Extract keywords related to the current "${schedule}" context.
-      3. **Filter Habits**: Check if any provided habits match the current input "${text}".
-      4. **Synthesize**: Generate 4 predictions that satisfy the Filter Constraint ("${text}...") and maximize Context Relevance.
-         - *Conflict Rule*: If History demands an answer (e.g., "Do you want water?"), predict "Yes"/"No" or relevant answers BEFORE schedule/habit suggestions.
-      
-      # Output Format
-      Return a SINGLE JSON object. No markdown.
-      {
-        "thought_process": "1-sentence explanation of how you used Schedule/History to choose these specific words.",
-        "predictions": [
-          { "word": "Label1", "sentence": "Complete, conversational sentence." },
-          { "word": "Label2", "sentence": "Complete, conversational sentence." },
-          // ...
-          { "word": "Label4", "sentence": "Complete, conversational sentence." }
-        ]
-      }
+          # Output Format (JSON Only):
+          {
+            "thought_process": "Why you chose these starters based on schedule/time.",
+            "predictions": [
+              { "word": "Topic With Spaces", "sentence": "Full conversational starter sentence." },
+              { "word": "Another Topic", "sentence": "Full conversational starter sentence." },
+              // ... generate 12 total
+            ]
+          }
 
-      # Guidelines for 'word' field:
-      - This appears in a small bubble. Keep it SHORT (1-2 words max).
-      - Do NOT use slashes or prefixes like "Icon/". Just the word itself.
+          # Guidelines for 'word':
+          - **Use Title Case and SPACES**. (e.g., "Dining Experience", NOT "DININGEXPERIENCE").
+          - Keep it short (2-3 words max).
+        `;
+    } else {
+        prompt = `
+          # Role: ThoughtFlow Predictive Component (Context-Aware AAC)
+          Your job is to predict the user's *intended next word* by fusing 5 real-time context signals.
+          
+          # The 5 Signals (Hierarchy of Importance):
+          1. **Signal 6 [The Filter]**: HARD CONSTRAINT. Predictions MUST start with the user's current input: "${text}". 
+             - **EXCEPTION**: If input is EMPTY, predict 4 distinct conversation starters based on Schedule/History/Time.
+          2. **Signal 1 [The Listener]**: CRITICAL PRIORITY. Conversation Continuity. If the last message was a question, suggesting a direct answer is the top priority.
+          3. **Signal 4 [The Habits]**: High Priority. Users repeat themselves. If a frequent habit matches the input/context, it wins.
+          4. **Signal 2 [The Scheduler]**: Context Booster. If the schedule says "Art Class", boost words like "paint", "color", "canvas".
+          5. **Signal 5 [The Grammar]**: Syntactic Validity. Ensure the sentence makes grammatical sense.
 
-      # Guidelines for 'sentence' field:
-      - **Conversational**: Must be a natural thing to say.
+          # Current State Signals
+          ${systemContext}
+          [Signal 1 - Recent History]:
+          ${history || "None"}
+          
+          [Signal 4 - Habit Bank]:
+          ${habits && habits.length > 0 ? habits.slice(0, 50).join(', ') : "None provided"}
 
-      - **Expansion**: If 'word' is "Water", 'sentence' must be "I need some water please" or "Can I get a drink?". NEVER just "Water".
-      - **Grammar**: Fix articles and pronouns. (e.g., "to face" -> "to my face").
-      - **Variety**: If reasonable, offer slightly different intents for the same word, or varied phrasing.
-      - **Completeness**: Even if the user only typed a few letters, the 'sentence' should be the FULL thought.
+          [Signal 6 - Current Input Buffer]:
+          "${text}"
 
+          # Prediction Algorithm (Execute Step-by-Step):
+          1. **Check History (Signal 1)**: IMMEDIATELY analyze the last incoming message. Does it demand a response (Who/What/Where/When)? If yes, prioritize answers in the predictions.
+          2. **Analyze Schedule**: Extract keywords related to the current "${schedule}" context.
+          3. **Filter Habits**: Check if any provided habits match the current input "${text}".
+          4. **Synthesize**: Generate 4 predictions that satisfy the Filter Constraint ("${text}...") and maximize Context Relevance.
+             - *Conflict Rule*: If History demands an answer (e.g., "Do you want water?"), predict "Yes"/"No" or relevant answers BEFORE schedule/habit suggestions.
+          
+          # Output Format
+          Return a SINGLE JSON object. No markdown.
+          {
+            "thought_process": "1-sentence explanation of how you used Schedule/History to choose these specific words.",
+            "predictions": [
+              { "word": "Label1", "sentence": "Complete, conversational sentence." },
+              { "word": "Label2", "sentence": "Complete, conversational sentence." },
+              // ...
+              { "word": "Label4", "sentence": "Complete, conversational sentence." }
+            ]
+          }
 
-    `;
+          # Guidelines for 'word' field:
+          - This appears in a small bubble. Keep it SHORT (1-2 words max).
+          - Do NOT use slashes or prefixes like "Icon/". Just the word itself.
+
+          # Guidelines for 'sentence' field:
+          - **Conversational**: Must be a natural thing to say.
+
+          - **Expansion**: If 'word' is "Water", 'sentence' must be "I need some water please" or "Can I get a drink?". NEVER just "Water".
+          - **Grammar**: Fix articles and pronouns. (e.g., "to face" -> "to my face").
+          - **Variety**: If reasonable, offer slightly different intents for the same word, or varied phrasing.
+          - **Completeness**: Even if the user only typed a few letters, the 'sentence' should be the FULL thought.
+        `;
+    }
 
     let rawText = "";
 
@@ -160,13 +192,21 @@ export async function POST(req: NextRequest) {
     }
 
     // Map to SuggestionResponse
-    const suggestions: SuggestionResponse[] = predictions.map((pred, idx) => ({
-      id: `${ACTIVE_PROVIDER}-${Date.now()}-${idx}`,
-      label: pred.word, 
-      text: pred.sentence, // Store the full sentence here
-      type: 'prediction',
-      confidence: 0.9 - (idx * 0.1)
-    }));
+    const suggestions: SuggestionResponse[] = predictions.map((pred, idx) => {
+        // Fallback: Fix CamelCase if the AI failed to add spaces (e.g. "DiningExperience" -> "Dining Experience")
+        let niceLabel = pred.word;
+        if (!niceLabel.includes(' ') && niceLabel.length > 8) {
+             niceLabel = niceLabel.replace(/([a-z])([A-Z])/g, '$1 $2');
+        }
+
+        return {
+            id: `${ACTIVE_PROVIDER}-${Date.now()}-${idx}`,
+            label: niceLabel, 
+            text: pred.sentence, // Store the full sentence here
+            type: 'prediction',
+            confidence: 0.9 - (idx * 0.1)
+        };
+    });
     
     // MODEL METADATA
     const usedModel = ACTIVE_PROVIDER === 'openai' ? 'gpt-4o-mini' : 'gemini-2.0-flash-exp';

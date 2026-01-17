@@ -23,6 +23,11 @@ export default function Cockpit() {
       const state = useStore.getState();
       const currentText = state.typedText;
 
+      // Auto-switch to text mode on typing if in spark mode
+      if (state.inputMode === 'spark' && (e.key.length === 1 || e.key === 'Backspace')) {
+        state.setInputMode('text');
+      }
+
       if (e.key === 'Backspace') {
         state.setTypedText(currentText.slice(0, -1));
       } else if (e.key === 'Escape') {
@@ -170,7 +175,10 @@ export default function Cockpit() {
       {(inputMode !== 'schedule' || schedulerAddingToBlock) && (
       <div className="shrink-0 px-6 pb-4 flex items-stretch gap-3">
         {/* INPUT BAR + CLEAR */}
-        <div className="flex-1 h-16 bg-slate-800/50 backdrop-blur-md rounded-2xl px-5 flex items-center shadow-lg border border-white/5 focus-within:bg-slate-800/80 transition-all relative group">
+        <div 
+            onClick={() => inputMode === 'spark' && setInputMode('text')}
+            className="flex-1 h-16 bg-slate-800/50 backdrop-blur-md rounded-2xl px-5 flex items-center shadow-lg border border-white/5 focus-within:bg-slate-800/80 transition-all relative group cursor-text"
+        >
             <div className="flex-1 overflow-hidden flex items-center whitespace-nowrap">
               <span className={`text-xl font-medium tracking-tight inline-flex items-center ${typedText ? 'text-white' : 'text-slate-500'}`}>
                 {typedText ? (
@@ -303,14 +311,41 @@ export default function Cockpit() {
                      <SchedulerView />
                 </div>
               ) : (
-                <div className="h-full w-full flex flex-col items-center justify-center text-slate-500 gap-4">
-                    <div className="w-20 h-20 rounded-full bg-sky-500/10 border border-sky-500/20 flex items-center justify-center animate-pulse">
-                        <Activity className="w-8 h-8 text-sky-400" />
-                    </div>
-                    <div className="text-center">
+                <div className="h-full w-full flex flex-col items-center justify-center text-slate-500 gap-4 p-6 pt-24">
+                    <div className="text-center mb-2">
                         <h3 className="text-lg font-medium text-sky-300">Spark Mode</h3>
-                        <p className="text-sm opacity-60">Neural predictive text engine</p>
+                        <p className="text-sm opacity-60">Neural conversation starters</p>
                     </div>
+
+                    {isPredicting ? (
+                       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full h-full overflow-y-auto pb-4 content-start">
+                           {[1,2,3,4,5,6,7,8,9,10,11,12].map(i => (
+                               <div key={i} className="rounded-2xl bg-slate-800/50 border border-slate-700/50 animate-pulse min-h-[110px]" />
+                           ))}
+                       </div>
+                    ) : (
+                         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full h-full overflow-y-auto pb-4 content-start">
+                            {suggestions.slice(0, 12).map((sug) => (
+                                <button
+                                    key={sug.id}
+                                    onClick={() => {
+                                      setTypedText(sug.text);
+                                      setInputMode('text');
+                                    }}
+                                    className="relative group p-4 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 hover:border-sky-500/30 transition-all flex flex-col justify-between gap-2 text-left min-h-[110px]"
+                                >
+                                    <div className="flex items-center justify-between w-full">
+                                        <span className="text-sky-400 font-bold text-xs tracking-wide uppercase truncate pr-2 opacity-90">{sug.label}</span>
+                                        <Volume2 className="w-3.5 h-3.5 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                                    </div>
+                                    <p className="text-slate-100 font-medium text-sm sm:text-base leading-snug line-clamp-3">
+                                        {sug.text}
+                                    </p>
+                                    <div className="absolute inset-0 rounded-2xl ring-1 ring-sky-500/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </button>
+                            ))}
+                         </div>
+                    )}
                 </div>
               )}
            </div>

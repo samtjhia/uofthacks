@@ -8,7 +8,7 @@ let debounceTimer: ReturnType<typeof setTimeout>;
 let predictionCache = new Map<string, SuggestionResponse[]>();
 const MAX_CACHE_SIZE = 200; // Increased to 200 to allow for extensive history
 const PREDICTION_DEBOUNCE_MS = 300; // Fast response
-const CACHE_KEY_STORAGE = 'gemini_prediction_cache_v3'; // Persists across reloads
+const CACHE_KEY_STORAGE = 'gemini_prediction_cache_v5'; // Persists across reloads
 
 // Load cache from localStorage (client-side only)
 if (typeof window !== 'undefined') {
@@ -120,7 +120,12 @@ export const useStore = create<AppState>((set, get) => ({
   setIsSpeaking: (isSpeaking) => set({ isSpeaking }),
 
   inputMode: 'text',
-  setInputMode: (mode) => set({ inputMode: mode, schedulerAddingToBlock: null }),
+  setInputMode: (mode) => {
+    set({ inputMode: mode, schedulerAddingToBlock: null });
+    if (mode === 'spark') {
+        get().refreshPredictions('');
+    }
+  },
   
   typedText: '',
   pictureCategory: null,
@@ -152,14 +157,17 @@ export const useStore = create<AppState>((set, get) => ({
 
   // EXPOSED PREDICTION FUNCTION (For Manual Triggering)
   refreshPredictions: async (textOverride?: string) => {
-        const text = textOverride !== undefined ? textOverride : get().typedText;
+        const state = get();
+        const inputMode = state.inputMode;
+        const isSpark = inputMode === 'spark';
+
+        const text = isSpark ? '' : (textOverride !== undefined ? textOverride : state.typedText);
         
         // Start Loading State
         set({ isPredicting: true });
 
         try {
-            get().addEngineLog(`⏳ Engine Activated. Reason: ${text ? 'Typing' : 'Zero-Shot Context'}...`, 'info');
-            const state = get();
+            get().addEngineLog(`⏳ Engine Activated. Reason: ${isSpark ? 'Spark Mode' : (text ? 'Typing' : 'Zero-Shot Context')}...`, 'info');
             
             // PREPARE SIGNALS (Early for Cache Key)
             const now = new Date();
@@ -167,11 +175,12 @@ export const useStore = create<AppState>((set, get) => ({
             const relevantSchedule = state.scheduleItems.map(i => `${i.timeBlock}: ${i.label}`).join(', ');
 
             // Get recent history for context (last 3 messages is usually enough for immediate context)
-            const recentHistory = state.history.slice(-3).map(m => `${m.role}: ${m.content}`).join('\n');
+            // If in Spark mode, we intentionally IGNORE history to provide fresh starters
+            const recentHistory = isSpark ? '' : state.history.slice(-3).map(m => `${m.role}: ${m.content}`).join('\n');
             
             // FIX: Do NOT trim text. "so" (completions) and "so " (next word) are different states.
             // Cache Key now includes Schedule to differentiate contexts (e.g. Beach vs Home)
-            const cacheKey = `${text}|${recentHistory}|${relevantSchedule}`; 
+            const cacheKey = `${isSpark ? 'SPARK' : 'PREDICT'}|${text}|${recentHistory}|${relevantSchedule}`; 
 
             // CHECK CACHE FIRST
             if (predictionCache.has(cacheKey)) {
@@ -193,6 +202,7 @@ export const useStore = create<AppState>((set, get) => ({
                 body: JSON.stringify({ 
                     text, 
                     history: recentHistory,
+                    mode: isSpark ? 'spark' : 'predict',
                     // New Context Signals
                     time: timeString,
                     userProfile: state.userProfile,

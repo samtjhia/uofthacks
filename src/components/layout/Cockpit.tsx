@@ -111,13 +111,13 @@ export default function Cockpit() {
   const DEFAULTS: SuggestionResponse[] = [
     { id: 'd1', label: 'Yes', text: 'Yes', type: 'prediction' },
     { id: 'd2', label: 'No', text: 'No', type: 'prediction' },
-    { id: 'd3', label: 'Help', text: 'Help', type: 'prediction' },
+    { id: 'd3', label: 'Hi', text: 'Hi', type: 'prediction' },
     { id: 'd4', label: 'Thanks', text: 'Thanks', type: 'prediction' }
   ];
 
-  // Logic update: Trust the store's suggestions (which now come from Grammar Engine).
-  // If no text is typed, ALWAYS show the critical defaults.
-  const wordSuggestions = !typedText
+  // Logic update: Trust the store's suggestions (which now come from Grammar and Gemini).
+  // CRITICAL: User requirement - If input is empty (or just whitespace), ALWAYS show defaults in bubbles.
+  const wordSuggestions = (!typedText || typedText.trim() === '')
     ? DEFAULTS
     : suggestions.slice(0, 4);
 

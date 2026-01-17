@@ -14,17 +14,27 @@ import {
   Mic, 
   MicOff,
   History,
-  BrainCircuit
+  BrainCircuit,
+  Terminal,
+  Zap
 } from 'lucide-react';
 
 export default function LeftSidebar() {
-  const { history, isListening, fetchHistory } = useStore((state: AppState) => state);
+  const { history, isListening, fetchHistory, engineLogs, cacheStats } = useStore((state: AppState) => state);
   const [activeTab, setActiveTab] = useState<'history' | 'brain'>('history');
   const dummyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchHistory();
   }, []);
+
+  useEffect(() => {
+     // Scroll to top of logs when updated, or bottom? Usually terminals scroll to bottom.
+     if (activeTab === 'brain') {
+        // dummyRef is at bottom
+        dummyRef.current?.scrollIntoView({ behavior: 'smooth' });
+     }
+  }, [engineLogs, activeTab]);
 
   useEffect(() => {
     if (activeTab === 'history') {
@@ -110,140 +120,68 @@ export default function LeftSidebar() {
                             : 'bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white'
                        }`}>
                            <Volume2 className="w-3.5 h-3.5" />
-                           {msg.role === 'user' ? 'Repeat' : 'Replay'}
+                           <span>Speak</span>
                        </button>
                    </div>
                 </div>
-                
-                <span className="text-[10px] text-slate-500 mt-1 px-1 opacity-60 font-medium">
-                    {msg.role === 'user' ? 'You' : 'Partner'}
-                </span>
+                <div className="mt-1 px-2 text-[10px] text-slate-500 font-medium opacity-60">
+                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
               </div>
             ))}
             <div ref={dummyRef} />
           </div>
         )}
 
-        {/* === TAB 2: 7-SIGNAL ENGINE === */}
+        {/* === TAB 2: ENGINE BRAIN (Terminal View) === */}
         {activeTab === 'brain' && (
-          <div className="h-full overflow-y-auto p-5 space-y-5 scrollbar-thin scrollbar-thumb-slate-700/50 scrollbar-track-transparent">
-             
-             {/* Intro Card */}
-             <div className="col-span-1 p-4 rounded-2xl bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20">
-                 <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-widest mb-1">System Architecture</h3>
-                 <p className="text-xs text-slate-400">ThoughtFlow Engine v1.0 connected.</p>
-             </div>
-
-             <div className="space-y-3">
-                 {/* 1. THE LISTENER */}
-                 <div className={`p-3 rounded-xl border transition-all ${isListening ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-slate-800/30 border-white/5'}`}>
-                     <div className="flex items-center gap-3 mb-2">
-                         <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isListening ? 'bg-emerald-500 text-white animate-pulse' : 'bg-slate-700 text-slate-400'}`}>
-                             {isListening ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-                         </div>
-                         <div>
-                             <h4 className="text-sm font-bold text-slate-200">The Listener</h4>
-                             <p className="text-[10px] text-slate-500">Audio Context • Deaf by Default</p>
-                         </div>
-                     </div>
-                     <div className="flex items-center justify-between px-1">
-                         <span className="text-[10px] text-slate-400 uppercase tracking-wider">{isListening ? 'Conversation Mode' : 'Privacy Mode'}</span>
-                         <span className={`text-[10px] font-bold uppercase ${isListening ? 'text-emerald-400' : 'text-slate-500'}`}>{isListening ? 'ACTIVE' : 'OFFLINE'}</span>
-                     </div>
+           <div className="h-full flex flex-col font-mono text-xs overflow-hidden">
+              {/* Stats Header */}
+              <div className="shrink-0 p-4 border-b border-white/5 bg-slate-900/50 flex items-center justify-between">
+                 <div className="flex gap-4">
+                    <div className="flex items-center gap-2 text-emerald-400">
+                        <Zap className="w-3.5 h-3.5" />
+                        <span className="font-bold">ONLINE</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-400">
+                        <Database className="w-3.5 h-3.5" />
+                        <span>Cache: <span className="text-slate-200">{cacheStats?.size || 0}/{cacheStats?.max || 50}</span></span>
+                    </div>
                  </div>
+                 <div className="text-[10px] text-slate-600 uppercase tracking-wider font-bold">gemini-2.0-flash-exp</div>
+              </div>
 
-                 {/* 2. THE SCHEDULER */}
-                 <div className="p-3 rounded-xl bg-slate-800/30 border border-white/5 flex items-center gap-3">
-                     <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
-                         <Clock className="w-4 h-4" />
-                     </div>
-                     <div className="flex-1">
-                         <h4 className="text-sm font-bold text-slate-200">The Scheduler</h4>
-                         <div className="flex justify-between items-center mt-1">
-                             <span className="text-[10px] text-slate-400">Time Context</span>
-                             <span className="text-[10px] font-mono text-blue-300 bg-blue-500/10 px-1.5 py-0.5 rounded">12:42 PM • Lunch</span>
-                         </div>
-                     </div>
-                 </div>
+              {/* Terminal Logs */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-black/40">
+                  {engineLogs.length === 0 && (
+                      <div className="text-slate-600 italic mt-10 text-center">Engine standby...</div>
+                  )}
+                  {/* Reverse logs to show newest at bottom if we flex-col-reverse, OR just map normally and scroll to bottom */}
+                  {[...engineLogs].reverse().map((log) => (
+                      <div key={log.id} className="flex gap-3">
+                          <span className="shrink-0 text-slate-600 select-none">[{log.timestamp}]</span>
+                          <span className={`${
+                              log.type === 'error' ? 'text-red-400' :
+                              log.type === 'success' ? 'text-emerald-400' :
+                              log.type === 'warning' ? 'text-amber-400' :
+                              'text-sky-300'
+                          }`}>
+                              {log.type === 'info' && <span className="mr-2 opacity-50">$</span>}
+                              {log.message}
+                          </span>
+                      </div>
+                  ))}
+                  <div ref={dummyRef} />
+              </div>
 
-                 {/* 3. THE MEMORY */}
-                 <div className="p-3 rounded-xl bg-slate-800/30 border border-white/5 flex items-center gap-3">
-                     <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400">
-                         <Database className="w-4 h-4" />
-                     </div>
-                     <div className="flex-1">
-                         <h4 className="text-sm font-bold text-slate-200">The Memory</h4>
-                         <div className="flex justify-between items-center mt-1">
-                             <span className="text-[10px] text-slate-400">Long-Term (Backboard.io)</span>
-                             <div className="flex gap-1">
-                                 <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse delay-100"></span>
-                                 <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse delay-75"></span>
-                                 <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span>
-                             </div>
-                         </div>
-                     </div>
-                 </div>
-
-                 {/* 4. THE FREQUENCY */}
-                 <div className="p-3 rounded-xl bg-slate-800/30 border border-white/5 flex items-center gap-3">
-                     <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400">
-                         <BarChart2 className="w-4 h-4" />
-                     </div>
-                     <div className="flex-1">
-                         <h4 className="text-sm font-bold text-slate-200">The Frequency</h4>
-                         <div className="flex justify-between items-center mt-1">
-                             <span className="text-[10px] text-slate-400">Short-Term Habit (Atlas)</span>
-                             <div className="h-1 w-12 bg-slate-700 rounded-full overflow-hidden">
-                                 <div className="h-full bg-amber-500 w-3/4"></div>
-                             </div>
-                         </div>
-                     </div>
-                 </div>
-
-                 {/* 5. THE GRAMMAR */}
-                 <div className="p-3 rounded-xl bg-slate-800/30 border border-white/5 flex items-center gap-3">
-                     <div className="w-8 h-8 rounded-full bg-pink-500/20 flex items-center justify-center text-pink-400">
-                         <AlignLeft className="w-4 h-4" />
-                     </div>
-                     <div className="flex-1">
-                         <h4 className="text-sm font-bold text-slate-200">The Grammar</h4>
-                         <div className="flex justify-between items-center mt-1">
-                             <span className="text-[10px] text-slate-400">Predictive Syntax</span>
-                             <span className="text-[10px] text-slate-500">Ready</span>
-                         </div>
-                     </div>
-                 </div>
-
-                 {/* 6. THE FILTER */}
-                 <div className="p-3 rounded-xl bg-slate-800/30 border border-white/5 flex items-center gap-3">
-                     <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400">
-                         <Search className="w-4 h-4" />
-                     </div>
-                     <div className="flex-1">
-                         <h4 className="text-sm font-bold text-slate-200">The Filter</h4>
-                         <div className="flex justify-between items-center mt-1">
-                             <span className="text-[10px] text-slate-400">Spelling Constraint</span>
-                             <span className="text-[10px] text-slate-500">Auto</span>
-                         </div>
-                     </div>
-                 </div>
-
-                 {/* 7. THE VIBE */}
-                 <div className="p-3 rounded-xl bg-slate-800/30 border border-white/5 flex items-center gap-3">
-                     <div className="w-8 h-8 rounded-full bg-teal-500/20 flex items-center justify-center text-teal-400">
-                         <Smile className="w-4 h-4" />
-                     </div>
-                     <div className="flex-1">
-                         <h4 className="text-sm font-bold text-slate-200">The Vibe</h4>
-                         <div className="flex justify-between items-center mt-1">
-                             <span className="text-[10px] text-slate-400">Tone Modulation</span>
-                             <span className="text-[10px] text-teal-300">Empathic</span>
-                         </div>
-                     </div>
-                 </div>
-             
-             </div>
-          </div>
+                {/* Input Simulation (Visual only) */}
+                <div className="shrink-0 p-2 bg-black/60 border-t border-white/5">
+                    <div className="flex items-center gap-2 text-slate-500 px-2">
+                        <span>{'>'}</span>
+                        <span className="animate-pulse">_</span>
+                    </div>
+                </div>
+           </div>
         )}
 
       </div>

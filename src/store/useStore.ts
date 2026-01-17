@@ -6,9 +6,9 @@ let debounceTimer: ReturnType<typeof setTimeout>;
 
 // Simple LRU Cache for Predictions
 let predictionCache = new Map<string, SuggestionResponse[]>();
-const MAX_CACHE_SIZE = 50;
+const MAX_CACHE_SIZE = 200; // Increased to 200 to allow for extensive history
 const PREDICTION_DEBOUNCE_MS = 300; // Fast response
-const CACHE_KEY_STORAGE = 'gemini_prediction_cache';
+const CACHE_KEY_STORAGE = 'gemini_prediction_cache_v3'; // Persists across reloads
 
 // Load cache from localStorage (client-side only)
 if (typeof window !== 'undefined') {
@@ -62,18 +62,25 @@ export interface AppState {
   setTypedText: (text: string) => void;
   history: ChatMessage[];
   suggestions: SuggestionResponse[];
+  habits: string[]; // Signal 4: Top frequency words
   userProfile: UserProfile | null;
   scheduleItems: ScheduleItem[];
   schedulerAddingToBlock: 'morning' | 'afternoon' | 'evening' | null;
   setSchedulerAddingToBlock: (block: 'morning' | 'afternoon' | 'evening' | null) => void;
   
+  // Debug / Engine State
+  engineLogs: { id: string, timestamp: string, message: string, type: 'info' | 'success' | 'warning' | 'error' }[];
+  addEngineLog: (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
+  cacheStats: { size: number, max: number };
+
   // Actions
   addHistoryItem: (item: ChatMessage) => Promise<void>;
   setSuggestions: (items: SuggestionResponse[]) => void;
+  refreshPredictions: (textOverride?: string) => Promise<void>;
 
   // Async Actions
   fetchHistory: () => Promise<void>;
-  fetchSuggestions: () => Promise<void>;
+  fetchSuggestions: (onlySignals?: boolean) => Promise<void>;
   fetchSchedule: () => Promise<void>;
   addScheduleItem: (label: string, timeBlock: 'morning' | 'afternoon' | 'evening', startTime?: string, durationMinutes?: number) => Promise<void>;
   updateScheduleItem: (id: string, updates: Partial<ScheduleItem>) => Promise<void>;
@@ -109,44 +116,81 @@ export const useStore = create<AppState>((set, get) => ({
     
     // 1. Level 1: Immediate Local Grammar (Latency < 10ms)
     // Provides instant feedback so the UI doesn't feel sluggish
+    get().addEngineLog(`Input: "${text}"`, 'info');
     const grammarSuggestions = getGrammarSuggestions(text);
     
     if (text.trim() !== '') {
          set({ suggestions: grammarSuggestions });
+         get().addEngineLog(`Grammar: Found ${grammarSuggestions.length} local matches`, 'info');
     } else {
         set({ suggestions: [] });
     }
 
     // 2. Level 2: Gemini Brain (Debounced)
-    // Provides context-aware deep predictions
+    // We allow empty text to trigger "Zero-Shot" predictions based on context (Schedule, Location, etc.)
     if (debounceTimer) clearTimeout(debounceTimer);
 
-    if (text.trim().length > 0) {
-      debounceTimer = setTimeout(async () => {
+    // Call shared prediction logic
+    debounceTimer = setTimeout(() => {
+        get().refreshPredictions(text); // Use helper function
+    }, PREDICTION_DEBOUNCE_MS);
+  },
+
+  // EXPOSED PREDICTION FUNCTION (For Manual Triggering)
+  refreshPredictions: async (textOverride?: string) => {
+        const text = textOverride !== undefined ? textOverride : get().typedText;
         try {
+            get().addEngineLog(`⏳ Engine Activated. Reason: ${text ? 'Typing' : 'Zero-Shot Context'}...`, 'info');
+            const state = get();
+            
+            // PREPARE SIGNALS (Early for Cache Key)
+            const now = new Date();
+            const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const relevantSchedule = state.scheduleItems.map(i => `${i.timeBlock}: ${i.label}`).join(', ');
+
             // Get recent history for context (last 3 messages is usually enough for immediate context)
-            const recentHistory = get().history.slice(-3).map(m => `${m.role}: ${m.content}`).join('\n');
-            const cacheKey = `${text.trim()}|${recentHistory}`; // Cache based on input + context
+            const recentHistory = state.history.slice(-3).map(m => `${m.role}: ${m.content}`).join('\n');
+            
+            // FIX: Do NOT trim text. "so" (completions) and "so " (next word) are different states.
+            // Cache Key now includes Schedule to differentiate contexts (e.g. Beach vs Home)
+            const cacheKey = `${text}|${recentHistory}|${relevantSchedule}`; 
 
             // CHECK CACHE FIRST
             if (predictionCache.has(cacheKey)) {
-                 console.log("Using cached prediction for:", text);
+                 // console.log("Using cached prediction for:", text);
+                 get().addEngineLog(`⚡ Cache HIT. (Size: ${predictionCache.size}/${MAX_CACHE_SIZE})`, 'success');
                  set({ suggestions: predictionCache.get(cacheKey)! });
                  return;
             }
 
+            get().addEngineLog(`💨 Cache MISS [${predictionCache.size}]. Fetching from Gemini...`, 'warning');
             console.log("⚡ Fetching new prediction from API for:", text);
+            
+            get().addEngineLog(`📡 Signals: Time=${timeString}, Sched=${state.scheduleItems.length}, Habits=${state.habits.length}`, 'info');
+
             const response = await fetch('/api/predict', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     text, 
-                    history: recentHistory 
+                    history: recentHistory,
+                    // New Context Signals
+                    time: timeString,
+                    userProfile: state.userProfile,
+                    schedule: relevantSchedule,
+                    // Signal 4: Top 20 Habits
+                    habits: state.habits.slice(0, 20)
                 })
             });
 
             if (response.ok) {
                 const data = await response.json();
+                
+                // Log the thought process from the API
+                if (data.reasoning) {
+                   get().addEngineLog(`🧠 Thought: ${data.reasoning}`, 'info');
+                }
+
                 if (data.suggestions && Array.isArray(data.suggestions)) {
                     // Update Store
                     set({ suggestions: data.suggestions });
@@ -157,24 +201,35 @@ export const useStore = create<AppState>((set, get) => ({
                         if (firstKey) predictionCache.delete(firstKey);
                     }
                     predictionCache.set(cacheKey, data.suggestions);
+                    set({ cacheStats: { size: predictionCache.size, max: MAX_CACHE_SIZE } });
+                    get().addEngineLog(`✅ Gemini: Returned ${data.suggestions.length} predictions`, 'success');
                     saveCacheToDisk(); // Persist to localStorage
                 }
             }
         } catch (error) {
             console.error("Gemini Prediction Failed:", error);
+            get().addEngineLog(`❌ Gemini Error: ${error}`, 'error');
             // Fail silently, keeping the Grammar suggestions
         }
-      }, PREDICTION_DEBOUNCE_MS);
-    }
   },
   
   history: [],
   suggestions: MOCK_SUGGESTIONS,
+  habits: [],
   userProfile: null,
   scheduleItems: [],
   schedulerAddingToBlock: null,
   setSchedulerAddingToBlock: (block) => set({ schedulerAddingToBlock: block }),
   
+  engineLogs: [],
+  cacheStats: { size: predictionCache.size, max: MAX_CACHE_SIZE },
+  addEngineLog: (message, type = 'info') => set(state => ({ 
+      engineLogs: [
+          { id: Math.random().toString(36).substr(2, 9), timestamp: new Date().toLocaleTimeString(), message, type },
+          ...state.engineLogs
+      ].slice(0, 50) // Keep last 50 logs
+  })),
+
   addHistoryItem: async (item) => {
     // Optimistic update
     set((state) => ({ history: [...state.history, item] }));
@@ -210,21 +265,30 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  fetchSuggestions: async () => {
+  fetchSuggestions: async (onlySignals = false) => {
     try {
       const res = await fetch('/api/frequency');
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
-          const suggestions = data.map((h: any) => ({
-            id: h._id,
-            label: h.text.length > 15 ? h.text.substring(0, 15) + '...' : h.text,
-            text: h.text,
-            type: 'prediction' as const,
-          }));
-          set({ suggestions });
+          // Store pure strings for sending to Gemini as "Habits"
+          const habitStrings = data.map((h:any) => h.text);
+          
+          if (!onlySignals) {
+              const suggestions = data.map((h: any) => ({
+                id: h._id,
+                label: h.text.length > 15 ? h.text.substring(0, 15) + '...' : h.text,
+                text: h.text,
+                type: 'prediction' as const,
+              }));
+              set({ suggestions, habits: habitStrings });
+          } else {
+              // Just update habits, leave suggestions alone (presumably they are being handled by Smart Engine)
+              set({ habits: habitStrings });
+          }
         } else {
-          set({ suggestions: MOCK_SUGGESTIONS });
+          if (!onlySignals) set({ suggestions: MOCK_SUGGESTIONS, habits: [] });
+          else set({ habits: [] });
         }
       }
     } catch (error) {

@@ -4,11 +4,25 @@ import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { Mic, MicOff, Smile, Frown, Meh, Heart, MessageCircle } from 'lucide-react';
 
 export default function RightSidebar() {
-  const { isListening, toggleListening, suggestions, setTypedText, addHistoryItem, isAutoMode, toggleAutoMode, fetchSuggestions, reinforceHabit } = useStore();
+  const { isListening, toggleListening, suggestions, setTypedText, addHistoryItem, isAutoMode, toggleAutoMode, fetchSuggestions, fetchSchedule, reinforceHabit, refreshPredictions } = useStore();
   
   React.useEffect(() => {
-    fetchSuggestions();
-  }, [fetchSuggestions]);
+    // 1. Initialize Signals (Silently)
+    // We want Habit data and Schedule data loaded in the store, 
+    // BUT we don't want "dumb" frequency list to overwrite the UI.
+    const initSignals = async () => {
+        await Promise.all([
+            fetchSchedule(), 
+            fetchSuggestions(true) // true = load signals only, do not set UI suggestions
+        ]);
+        
+        // 2. Trigger the "Brain" (Smart Engine)
+        // Now that signals are loaded, ask Gemini to predict based on Schedule+Habits
+        refreshPredictions('');
+    };
+    
+    initSignals();
+  }, [fetchSuggestions, fetchSchedule, refreshPredictions]);
   
   // Use a ref to track if we should auto-restart to avoid closure staleness
   const autoModeRef = React.useRef(isAutoMode);
@@ -135,12 +149,9 @@ export default function RightSidebar() {
                 {/* Subtle highlight effect on hover */}
                 <div className="absolute inset-0 bg-gradient-to-r from-sky-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                
-               <div className="relative z-10">
-                 <div className="font-semibold text-sm text-slate-200 mb-1 group-hover:text-sky-300 transition-colors">
-                   {sug.label}
-                 </div>
-                 <div className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
-                   "{sug.text}"
+               <div className="relative z-10 p-1">
+                 <div className="font-medium text-[15px] leading-snug text-slate-200 group-hover:text-sky-300 transition-colors">
+                   {sug.text}
                  </div>
                </div>
              </button>

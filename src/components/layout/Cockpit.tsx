@@ -1,8 +1,10 @@
+"use client";
 import React from 'react';
 import { useStore } from '@/store/useStore';
 import { Activity, Keyboard, Grid, Zap, Volume2 } from 'lucide-react';
 import VirtualKeyboard from './VirtualKeyboard';
 import PictureGrid from './PictureGrid';
+import { speakText } from '@/lib/elevenlabs';
 
 export default function Cockpit() {
   const { isListening, inputMode, setInputMode, typedText, setTypedText, suggestions } = useStore();
@@ -21,9 +23,10 @@ export default function Cockpit() {
     setTypedText(typedText ? `${typedText} ${label}` : label);
   };
   
-  const handleSpeak = () => {
-     // TODO: Connect to ElevenLabs hooked in Phase 3
-     console.log("Speaking:", typedText);
+  const handleSpeak = async () => {
+    if (!typedText) return;
+    console.log('Speaking:', typedText);
+    await speakText(typedText);
   };
 
   const wordSuggestions = suggestions.slice(0, 3); // Take first 3 for the "Blue Buttons"

@@ -15,6 +15,8 @@ export interface AppState {
   setAudioLevel: (level: number) => void;
   isAutoMode: boolean;
   toggleAutoMode: () => void;
+  isSpeaking: boolean;
+  setIsSpeaking: (isSpeaking: boolean) => void;
 
   inputMode: 'text' | 'picture' | 'spark';
   setInputMode: (mode: 'text' | 'picture' | 'spark') => void;
@@ -56,6 +58,8 @@ export const useStore = create<AppState>((set) => ({
   setAudioLevel: (level) => set({ audioLevel: level }),
   isAutoMode: false,
   toggleAutoMode: () => set((state) => ({ isAutoMode: !state.isAutoMode })),
+  isSpeaking: false,
+  setIsSpeaking: (isSpeaking) => set({ isSpeaking }),
 
   inputMode: 'text',
   setInputMode: (mode) => set({ inputMode: mode }),

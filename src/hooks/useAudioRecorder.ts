@@ -68,7 +68,13 @@ export function useAudioRecorder(onFinished?: (blob: Blob) => void): UseAudioRec
   const startRecording = useCallback(async () => {
     setError(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        }
+      });
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
@@ -126,6 +132,15 @@ export function useAudioRecorder(onFinished?: (blob: Blob) => void): UseAudioRec
       const SILENCE_DURATION = 1500; 
       
       const detectSilence = () => {
+        // Pause detection while AI is speaking
+        const isSpeaking = useStore.getState().isSpeaking;
+        if (isSpeaking) {
+            silenceStartRef.current = Date.now();
+            // Do NOT set hasSpokenRef to true here.
+            animationFrameRef.current = requestAnimationFrame(detectSilence);
+            return;
+        }
+
         if (!analyserRef.current) return;
         
         const bufferLength = analyserRef.current.frequencyBinCount;

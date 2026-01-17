@@ -109,7 +109,10 @@ export default function LeftSidebar() {
                    {/* PLAY AUDIO BUTTON - For BOTH User and Assistant */}
                    <div className={`mt-3 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                        <button 
-                         onClick={() => handlePlay(msg.content)}
+                         onClick={(e) => {
+                             e.currentTarget.blur();
+                             handlePlay(msg.content);
+                         }}
                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm backdrop-blur-md transition-all active:scale-95 ${
                            msg.role === 'user'
                             ? 'bg-white/20 hover:bg-white/30 text-white'

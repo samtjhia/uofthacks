@@ -116,7 +116,7 @@ export default function RightSidebar() {
           {suggestions.map((sug, idx) => (
              <button
                key={sug.id}
-               onClick={() => setTypedText(sug.text)}
+               onClick={(e) => { e.currentTarget.blur(); setTypedText(sug.text); }}
                className="w-full text-left p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 transition-all group relative overflow-hidden"
              >
                 {/* Subtle highlight effect on hover */}
@@ -147,7 +147,7 @@ export default function RightSidebar() {
             </span>
             
           <button
-            onClick={handleManualStop}
+            onClick={(e) => { e.currentTarget.blur(); handleManualStop(); }}
             className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 shadow-xl ${
               isListening
                 ? 'bg-red-500 text-white shadow-[0_0_40px_rgba(239,68,68,0.4)] animate-pulse'
@@ -167,7 +167,7 @@ export default function RightSidebar() {
                 {isAutoMode ? 'AUTO LOOP ON' : 'AUTO LOOP OFF'}
              </span>
              <button
-               onClick={handleToggleAutoMode}
+               onClick={(e) => { e.currentTarget.blur(); handleToggleAutoMode(); }}
                className={`w-12 h-6 rounded-full relative transition-colors ${
                  isAutoMode ? 'bg-green-500/20 shadow-[0_0_10px_rgba(74,222,128,0.2)]' : 'bg-slate-700'
                }`}
@@ -191,6 +191,7 @@ export default function RightSidebar() {
             ].map((tone, idx) => (
               <button 
                 key={idx} 
+                onClick={(e) => e.currentTarget.blur()}
                 className="group flex flex-col items-center gap-1.5"
                 title={tone.label}
               >

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useStore, AppState } from '../../store/useStore';
+import { speakText } from '@/lib/elevenlabs';
 import { 
   Volume2, 
   Activity, 
@@ -19,6 +20,21 @@ import {
 export default function LeftSidebar() {
   const { history, isListening } = useStore((state: AppState) => state);
   const [activeTab, setActiveTab] = useState<'history' | 'brain'>('history');
+  const dummyRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (activeTab === 'history') {
+      dummyRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [history, activeTab]);
+
+  const handlePlay = async (text: string) => {
+    try {
+      await speakText(text);
+    } catch (error) {
+      console.error('Error playing audio:', error);
+    }
+  };
 
   return (
     <aside className="w-80 h-full border-r border-slate-700/30 bg-slate-900/80 backdrop-blur-xl flex flex-col font-sans text-slate-200 transition-all duration-300">
@@ -54,7 +70,7 @@ export default function LeftSidebar() {
         
         {/* === TAB 1: CONVERSATION HISTORY === */}
         {activeTab === 'history' && (
-          <div className="h-full overflow-y-auto p-4 space-y-6 scrollbar-thin scrollbar-thumb-slate-700/50 scrollbar-track-transparent">
+          <div className="h-full overflow-y-auto p-4 space-y-6 scrollbar-hide">
             {history.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-full text-slate-600 opacity-60">
                     <History className="w-12 h-12 mb-2 stroke-1" />
@@ -79,7 +95,12 @@ export default function LeftSidebar() {
 
                    {/* PLAY AUDIO BUTTON - For BOTH User and Assistant */}
                    <div className={`mt-3 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                       <button className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm backdrop-blur-md transition-all active:scale-95 ${
+                       <button 
+                         onClick={(e) => {
+                             e.currentTarget.blur();
+                             handlePlay(msg.content);
+                         }}
+                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm backdrop-blur-md transition-all active:scale-95 ${
                            msg.role === 'user'
                             ? 'bg-white/20 hover:bg-white/30 text-white'
                             : 'bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white'
@@ -95,6 +116,7 @@ export default function LeftSidebar() {
                 </span>
               </div>
             ))}
+            <div ref={dummyRef} />
           </div>
         )}
 

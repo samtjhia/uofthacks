@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect } from 'react';
 import { useStore } from '@/store/useStore';
+import { SuggestionResponse } from '@/types';
 import { Activity, Volume2, X, Delete } from 'lucide-react';
 import VirtualKeyboard from './VirtualKeyboard';
 import PictureGrid from './PictureGrid';
@@ -8,7 +9,7 @@ import WaveformVisualizer from '../ui/WaveformVisualizer';
 import { speakText } from '@/lib/elevenlabs';
 
 export default function Cockpit() {
-  const { isListening, inputMode, setInputMode, typedText, setTypedText, suggestions, addHistoryItem } = useStore();
+  const { isListening, inputMode, setInputMode, typedText, setTypedText, suggestions, addHistoryItem, reinforceHabit } = useStore();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -50,6 +51,7 @@ export default function Cockpit() {
     console.log('Speaking:', typedText);
     const ok = await speakText(typedText);
     if (ok) {
+      reinforceHabit(typedText);
       addHistoryItem({
         id: Date.now().toString(),
         role: 'user',
@@ -69,7 +71,18 @@ export default function Cockpit() {
     setTypedText(typedText.slice(0, -1));
   };
 
-  const wordSuggestions = suggestions.slice(0, 4);
+  const DEFAULTS: SuggestionResponse[] = [
+    { id: 'd1', label: 'Yes', text: 'Yes', type: 'prediction' },
+    { id: 'd2', label: 'No', text: 'No', type: 'prediction' },
+    { id: 'd3', label: 'Thanks', text: 'Thanks', type: 'prediction' },
+    { id: 'd4', label: 'Help', text: 'Help', type: 'prediction' }
+  ];
+
+  const filteredSuggestions = typedText
+    ? suggestions.filter(s => s.label.trim().split(' ').length === 1).slice(0, 4)
+    : [];
+
+  const wordSuggestions = filteredSuggestions.length > 0 ? filteredSuggestions : DEFAULTS;
 
   return (
     <div className="flex-1 h-full flex flex-col bg-slate-900 text-slate-100 font-sans overflow-hidden">
@@ -156,7 +169,11 @@ export default function Cockpit() {
               {wordSuggestions.length > 0 ? wordSuggestions.map((sug) => (
                 <button 
                   key={sug.id}
-                  onClick={() => setTypedText(typedText + " " + sug.label)}
+                  onClick={(e) => {
+                    // e.currentTarget.blur(); // Optional but good for UI
+                    reinforceHabit(sug.label); // Send signal to DB
+                    setTypedText(typedText ? typedText + " " + sug.label : sug.label);
+                  }}
                   className="flex-1 min-w-[120px] px-6 h-full rounded-2xl bg-slate-800 border border-sky-500/30 text-sky-400 text-lg font-medium hover:bg-slate-700 hover:text-sky-300 hover:border-sky-400/50 transition-all shadow-sm active:scale-95 whitespace-nowrap"
                 >
                   {sug.label}

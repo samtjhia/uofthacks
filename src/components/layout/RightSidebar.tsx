@@ -121,7 +121,7 @@ export default function RightSidebar() {
             </h2>
         </div>
         
-        <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-700/50 scrollbar-track-transparent">
+        <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
           {suggestions.map((sug, idx) => (
              <button
                key={sug.id}

@@ -43,6 +43,9 @@ interface IScheduleItem {
   label: string;
   timeBlock: 'morning' | 'afternoon' | 'evening';
   order: number;
+  startTime?: string; // "HH:MM" 24h format
+  endTime?: string;   // "HH:MM" 24h format
+  durationMinutes?: number;
   createdAt: Date;
 }
 
@@ -50,6 +53,9 @@ const ScheduleSchema = new Schema<IScheduleItem>({
   label: { type: String, required: true },
   timeBlock: { type: String, enum: ['morning', 'afternoon', 'evening'], required: true },
   order: { type: Number, default: 0 },
+  startTime: { type: String },
+  endTime: { type: String },
+  durationMinutes: { type: Number },
   createdAt: { type: Date, default: Date.now }
 });
 

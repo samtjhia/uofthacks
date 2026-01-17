@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useStore } from '@/store/useStore';
 import { SuggestionResponse } from '@/types';
 import { Activity, Volume2, X, Delete, Plus, Check } from 'lucide-react';
@@ -7,10 +7,13 @@ import VirtualKeyboard from './VirtualKeyboard';
 import PictureGrid from './PictureGrid';
 import SchedulerView from './SchedulerView';
 import WaveformVisualizer from '../ui/WaveformVisualizer';
+import { TimePicker } from './TimePicker';
 import { speakText } from '@/lib/elevenlabs';
 
 export default function Cockpit() {
   const { isListening, inputMode, setInputMode, typedText, setTypedText, suggestions, addHistoryItem, reinforceHabit, schedulerAddingToBlock, setSchedulerAddingToBlock, addScheduleItem } = useStore();
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [pendingLabel, setPendingLabel] = useState('');
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -51,9 +54,9 @@ export default function Cockpit() {
     if (!typedText) return;
 
     if (schedulerAddingToBlock) {
-      await addScheduleItem(typedText, schedulerAddingToBlock);
-      setTypedText('');
-      setSchedulerAddingToBlock(null);
+      // Instead of adding immediately, open Time Picker
+      setPendingLabel(typedText);
+      setShowTimePicker(true);
       return;
     }
 
@@ -69,6 +72,25 @@ export default function Cockpit() {
       });
     } else {
       console.error('TTS failed');
+    }
+  };
+
+  const handleTimeConfirm = async (time: string, duration: number) => {
+    if (schedulerAddingToBlock && pendingLabel) {
+      await addScheduleItem(pendingLabel, schedulerAddingToBlock, time, duration);
+      setTypedText('');
+      setPendingLabel('');
+      setSchedulerAddingToBlock(null);
+      setShowTimePicker(false);
+    }
+  };
+
+  const getInitialTimeForBlock = () => {
+    switch (schedulerAddingToBlock) {
+      case 'morning': return '08:00';
+      case 'afternoon': return '12:00';
+      case 'evening': return '18:00';
+      default: return '12:00';
     }
   };
 
@@ -260,6 +282,14 @@ export default function Cockpit() {
               )}
            </div>
       </div>
+      {showTimePicker && (
+        <TimePicker 
+          initialTime={getInitialTimeForBlock()}
+          initialDuration={30}
+          onConfirm={handleTimeConfirm}
+          onCancel={() => setShowTimePicker(false)}
+        />
+      )}
     </div>
   );
 }

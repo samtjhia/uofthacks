@@ -39,7 +39,8 @@ export interface AppState {
   fetchHistory: () => Promise<void>;
   fetchSuggestions: () => Promise<void>;
   fetchSchedule: () => Promise<void>;
-  addScheduleItem: (label: string, timeBlock: 'morning' | 'afternoon' | 'evening') => Promise<void>;
+  addScheduleItem: (label: string, timeBlock: 'morning' | 'afternoon' | 'evening', startTime?: string, durationMinutes?: number) => Promise<void>;
+  updateScheduleItem: (id: string, updates: Partial<ScheduleItem>) => Promise<void>;
   deleteScheduleItem: (id: string) => Promise<void>;
   reinforceHabit: (text: string) => Promise<void>;
 }
@@ -68,7 +69,7 @@ export const useStore = create<AppState>((set, get) => ({
   setIsSpeaking: (isSpeaking) => set({ isSpeaking }),
 
   inputMode: 'text',
-  setInputMode: (mode) => set({ inputMode: mode }),
+  setInputMode: (mode) => set({ inputMode: mode, schedulerAddingToBlock: null }),
   
   typedText: '',
   setTypedText: (text) => set({ typedText: text }),
@@ -148,12 +149,12 @@ fetchSchedule: async () => {
     }
   },
 
-  addScheduleItem: async (label, timeBlock) => {
+  addScheduleItem: async (label, timeBlock, startTime, durationMinutes) => {
     try {
       const res = await fetch('/api/schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label, timeBlock }),
+        body: JSON.stringify({ label, timeBlock, startTime, durationMinutes }),
       });
       if (res.ok) {
         // Refresh schedule
@@ -162,6 +163,24 @@ fetchSchedule: async () => {
       }
     } catch (error) {
       console.error('Failed to add schedule item:', error);
+    }
+  },
+
+  updateScheduleItem: async (id, updates) => {
+    try {
+       // Optimistic
+       const current = get();
+       const newItems = current.scheduleItems.map(i => i._id === id ? { ...i, ...updates } : i);
+       set({ scheduleItems: newItems });
+
+       await fetch('/api/schedule', {
+         method: 'PUT',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ id, ...updates }),
+       });
+       // In background re-fetch to ensure consistency? Maybe later.
+    } catch (error) {
+      console.error('Failed to update schedule item:', error);
     }
   },
 

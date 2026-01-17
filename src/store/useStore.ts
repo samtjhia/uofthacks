@@ -1,5 +1,8 @@
 import { create } from 'zustand';
 import { ChatMessage, SuggestionResponse, UserProfile, ScheduleItem } from '@/types';
+import { getGrammarSuggestions } from '@/lib/grammar';
+
+let debounceTimer: ReturnType<typeof setTimeout>;
 
 export interface AppState {
   // UI State
@@ -72,7 +75,54 @@ export const useStore = create<AppState>((set, get) => ({
   setInputMode: (mode) => set({ inputMode: mode, schedulerAddingToBlock: null }),
   
   typedText: '',
-  setTypedText: (text) => set({ typedText: text }),
+  setTypedText: (text) => {
+    set({ typedText: text });
+    
+    // 1. Level 1: Immediate Local Grammar (Latency < 10ms)
+    // Provides instant feedback so the UI doesn't feel sluggish
+    const grammarSuggestions = getGrammarSuggestions(text);
+    
+    if (text.trim() !== '') {
+         set({ suggestions: grammarSuggestions });
+    } else {
+        set({ suggestions: [] });
+    }
+
+    // 2. Level 2: Gemini Brain (Debounced 500ms)
+    // Provides context-aware deep predictions
+    if (debounceTimer) clearTimeout(debounceTimer);
+
+    if (text.trim().length > 0) {
+      debounceTimer = setTimeout(async () => {
+        try {
+            // Get recent history for context (last 5 messages)
+            const recentHistory = get().history.slice(-5).map(m => `${m.role}: ${m.content}`).join('\n');
+            
+            const response = await fetch('/api/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    text, 
+                    history: recentHistory 
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.suggestions && Array.isArray(data.suggestions)) {
+                    // Start of Hybrid Merging Strategy
+                    // If Gemini returns fewer than 4, fill with grammar?
+                    // For now, let Gemini take the wheel if it returns valid results.
+                    set({ suggestions: data.suggestions });
+                }
+            }
+        } catch (error) {
+            console.error("Gemini Prediction Failed:", error);
+            // Fail silently, keeping the Grammar suggestions
+        }
+      }, 300); // 300ms debounce
+    }
+  },
   
   history: [],
   suggestions: MOCK_SUGGESTIONS,

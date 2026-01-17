@@ -114,11 +114,11 @@ export default function Cockpit() {
     { id: 'd4', label: 'Help', text: 'Help', type: 'prediction' }
   ];
 
-  const filteredSuggestions = typedText
-    ? suggestions.filter(s => s.label.trim().split(' ').length === 1).slice(0, 4)
-    : [];
-
-  const wordSuggestions = filteredSuggestions.length > 0 ? filteredSuggestions : DEFAULTS;
+  // Logic update: Trust the store's suggestions (which now come from Grammar Engine).
+  // Only fallback to DEFAULTS if store is completely empty.
+  const wordSuggestions = suggestions.length > 0 
+    ? suggestions.slice(0, 4)
+    : DEFAULTS;
 
   return (
     <div className="flex-1 h-full flex flex-col bg-slate-900 text-slate-100 font-sans overflow-hidden">

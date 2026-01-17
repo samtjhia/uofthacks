@@ -146,7 +146,7 @@ export default function RightSidebar() {
                  </div>
              ))
           ) : (
-          suggestions.map((sug, idx) => (
+          suggestions.slice(0, 4).map((sug, idx) => (
              <button
                key={sug.id}
                onClick={(e) => { 

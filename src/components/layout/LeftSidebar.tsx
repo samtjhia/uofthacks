@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 
 export default function LeftSidebar() {
-  const { history, isListening, fetchHistory, engineLogs, cacheStats } = useStore((state: AppState) => state);
+  const { history, isListening, fetchHistory, engineLogs, cacheStats, activeModel } = useStore((state: AppState) => state);
   const [activeTab, setActiveTab] = useState<'history' | 'brain'>('history');
   const dummyRef = useRef<HTMLDivElement>(null);
 
@@ -148,7 +148,7 @@ export default function LeftSidebar() {
                         <span>Cache: <span className="text-slate-200">{cacheStats?.size || 0}/{cacheStats?.max || 50}</span></span>
                     </div>
                  </div>
-                 <div className="text-[10px] text-slate-600 uppercase tracking-wider font-bold">gemini-2.0-flash-exp</div>
+                 <div className="text-[10px] text-slate-600 uppercase tracking-wider font-bold">{activeModel}</div>
               </div>
 
               {/* Terminal Logs */}

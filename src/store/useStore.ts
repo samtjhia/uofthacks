@@ -69,6 +69,7 @@ export interface AppState {
   setSchedulerAddingToBlock: (block: 'morning' | 'afternoon' | 'evening' | null) => void;
   
   // Debug / Engine State
+  activeModel: string;
   engineLogs: { id: string, timestamp: string, message: string, type: 'info' | 'success' | 'warning' | 'error' }[];
   addEngineLog: (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
   cacheStats: { size: number, max: number };
@@ -186,6 +187,11 @@ export const useStore = create<AppState>((set, get) => ({
             if (response.ok) {
                 const data = await response.json();
                 
+                // Update Model Info
+                if (data.model) {
+                   set({ activeModel: data.model });
+                }
+
                 // Log the thought process from the API
                 if (data.reasoning) {
                    get().addEngineLog(`🧠 Thought: ${data.reasoning}`, 'info');
@@ -202,13 +208,13 @@ export const useStore = create<AppState>((set, get) => ({
                     }
                     predictionCache.set(cacheKey, data.suggestions);
                     set({ cacheStats: { size: predictionCache.size, max: MAX_CACHE_SIZE } });
-                    get().addEngineLog(`✅ Gemini: Returned ${data.suggestions.length} predictions`, 'success');
+                    get().addEngineLog(`✅ ${data.model || 'AI'}: Returned ${data.suggestions.length} predictions`, 'success');
                     saveCacheToDisk(); // Persist to localStorage
                 }
             }
         } catch (error) {
             console.error("Gemini Prediction Failed:", error);
-            get().addEngineLog(`❌ Gemini Error: ${error}`, 'error');
+            get().addEngineLog(`❌ Engine Error: ${error}`, 'error');
             // Fail silently, keeping the Grammar suggestions
         }
   },
@@ -221,6 +227,7 @@ export const useStore = create<AppState>((set, get) => ({
   schedulerAddingToBlock: null,
   setSchedulerAddingToBlock: (block) => set({ schedulerAddingToBlock: block }),
   
+  activeModel: 'Offline',
   engineLogs: [],
   cacheStats: { size: predictionCache.size, max: MAX_CACHE_SIZE },
   addEngineLog: (message, type = 'info') => set(state => ({ 

@@ -1,23 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { SuggestionResponse } from '@/types';
+
+// --- CONFIGURATION ---
+// Change this to 'gemini' or 'openai' to switch providers
+const ACTIVE_PROVIDER: 'gemini' | 'openai' = (process.env.AI_PROVIDER as 'gemini' | 'openai') || 'openai';
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+
+// Initialize OpenAI
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY || '',
+});
 
 export async function POST(req: NextRequest) {
   try {
     const { text, history, time, schedule, userProfile, habits } = await req.json();
 
-    if (!process.env.GEMINI_API_KEY) {
-      return NextResponse.json(
-        { error: 'GEMINI_API_KEY is not configured' },
-        { status: 500 }
-      );
+    // Check Keys based on provider
+    if (ACTIVE_PROVIDER === 'gemini' && !process.env.GEMINI_API_KEY) {
+       return NextResponse.json({ error: 'GEMINI_API_KEY not configured' }, { status: 500 });
+    }
+    if (ACTIVE_PROVIDER === 'openai' && !process.env.OPENAI_API_KEY) {
+       return NextResponse.json({ error: 'OPENAI_API_KEY not configured' }, { status: 500 });
     }
 
-    // Use Gemini 2.0 Flash Experimental for maximum speed
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
     // Construct Signal-Rich Prompt
     let systemContext = `Current Time: ${time || "Unknown"}.\n`;
@@ -94,13 +103,33 @@ export async function POST(req: NextRequest) {
 
     `;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const rawText = response.text();
+    let rawText = "";
 
-    console.log("Gemini Raw:", rawText);
+    console.log(`🧠 Predicting with Provider: ${ACTIVE_PROVIDER.toUpperCase()}`);
 
-    // Clean up markdown if Gemini adds it despite instructions
+    if (ACTIVE_PROVIDER === 'openai') {
+        const completion = await openai.chat.completions.create({
+            messages: [
+                { role: "system", content: "You are a predictive text engine. Output JSON only." },
+                { role: "user", content: prompt }
+            ],
+            model: "gpt-4o-mini", // Recommended for speed/cost (comparable to Flash)
+            response_format: { type: "json_object" },
+            temperature: 0.7,
+        });
+        rawText = completion.choices[0].message.content || "{}";
+        console.log("OpenAI Raw:", rawText);
+    } 
+    else {
+        // Use Gemini 2.0 Flash Experimental
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        rawText = response.text();
+        console.log("Gemini Raw:", rawText);
+    }
+
+    // Clean up markdown if AI adds it (Gemini often does, OpenAI in JSON mode usually doesn't but safe to keep)
     const jsonStr = rawText.replace(/```json|```/g, '').trim();
     
     let predictions: { word: string, sentence: string }[] = [];
@@ -132,15 +161,17 @@ export async function POST(req: NextRequest) {
 
     // Map to SuggestionResponse
     const suggestions: SuggestionResponse[] = predictions.map((pred, idx) => ({
-      id: `gemini-${Date.now()}-${idx}`,
+      id: `${ACTIVE_PROVIDER}-${Date.now()}-${idx}`,
       label: pred.word, 
       text: pred.sentence, // Store the full sentence here
       type: 'prediction',
       confidence: 0.9 - (idx * 0.1)
     }));
+    
+    // MODEL METADATA
+    const usedModel = ACTIVE_PROVIDER === 'openai' ? 'gpt-4o-mini' : 'gemini-2.0-flash-exp';
 
-
-    return NextResponse.json({ suggestions, reasoning });
+    return NextResponse.json({ suggestions, reasoning, model: usedModel });
 
   } catch (error) {
     console.error('Error in /api/predict:', error);

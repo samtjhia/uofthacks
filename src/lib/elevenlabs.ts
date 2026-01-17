@@ -1,4 +1,5 @@
 import { DEFAULT_VOICE_ID } from '@/lib/voice';
+import { useStore } from '@/store/useStore';
 
 import { DEFAULT_ELEVENLABS_MODEL } from '@/lib/voice';
 
@@ -29,17 +30,25 @@ export const speakText = async (
     
     // Play the audio (may reject if browser blocks autoplay)
     try {
+      useStore.getState().setIsSpeaking(true);
+
+      audio.onended = () => {
+        useStore.getState().setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+      };
+
+      audio.onerror = () => {
+        useStore.getState().setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+      };
+
       await audio.play();
     } catch (playError) {
       console.error('Audio play error:', playError);
+      useStore.getState().setIsSpeaking(false);
       URL.revokeObjectURL(audioUrl);
       return false;
     }
-
-    // Clean up memory after playing
-    audio.onended = () => {
-      URL.revokeObjectURL(audioUrl);
-    };
 
     return true;
   } catch (error) {

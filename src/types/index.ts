@@ -42,5 +42,6 @@ export interface ScheduleItem {
   timeBlock: 'morning' | 'afternoon' | 'evening';
   order: number;
   startTime?: string; // "HH:MM"
+  endTime?: string;   // "HH:MM"
   durationMinutes?: number;
 }

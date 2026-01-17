@@ -20,7 +20,16 @@ export interface AppState {
 
   inputMode: 'text' | 'picture' | 'spark';
   setInputMode: (mode: 'text' | 'picture' | 'spark') => void;
+  // Picture/category UI
+  pictureCategory: string | null;
+  setPictureCategory: (cat: string | null) => void;
   
+  // Custom Items (Infinite Icon)
+  customItems: Array<{ id: string; label: string; category: string; image: string }>;
+  addCustomItem: (item: { id: string; label: string; category: string; image: string }) => void;
+  setCustomItems: (items: Array<{ id: string; label: string; category: string; image: string }>) => void;
+  removeCustomItem: (id: string) => void;
+
   // Data State
   typedText: string;
   setTypedText: (text: string) => void;
@@ -66,6 +75,8 @@ export const useStore = create<AppState>((set) => ({
   
   typedText: '',
   setTypedText: (text) => set({ typedText: text }),
+  pictureCategory: null,
+  setPictureCategory: (cat) => set({ pictureCategory: cat }),
   
   history: MOCK_HISTORY,
   suggestions: MOCK_SUGGESTIONS,
@@ -73,4 +84,9 @@ export const useStore = create<AppState>((set) => ({
   
   addHistoryItem: (item) => set((state) => ({ history: [...state.history, item] })),
   setSuggestions: (items) => set({ suggestions: items }),
+  
+  customItems: [],
+  addCustomItem: (item) => set((state) => ({ customItems: [...state.customItems, item] })),
+  setCustomItems: (items) => set({ customItems: items }),
+  removeCustomItem: (id) => set((state) => ({ customItems: state.customItems.filter(i => i.id !== id) })),
 }));

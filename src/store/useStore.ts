@@ -53,6 +53,8 @@ export interface AppState {
   toggleAutoMode: () => void;
   isSpeaking: boolean;
   setIsSpeaking: (isSpeaking: boolean) => void;
+  speechTone: 'neutral' | 'happy' | 'serious' | 'empathic';
+  setSpeechTone: (tone: 'neutral' | 'happy' | 'serious' | 'empathic') => void;
 
   inputMode: 'text' | 'picture' | 'spark' | 'schedule';
   setInputMode: (mode: 'text' | 'picture' | 'spark' | 'schedule') => void;
@@ -118,6 +120,8 @@ export const useStore = create<AppState>((set, get) => ({
   toggleAutoMode: () => set((state) => ({ isAutoMode: !state.isAutoMode })),
   isSpeaking: false,
   setIsSpeaking: (isSpeaking) => set({ isSpeaking }),
+  speechTone: 'neutral',
+  setSpeechTone: (tone) => set({ speechTone: tone }),
 
   inputMode: 'text',
   setInputMode: (mode) => set({ inputMode: mode, schedulerAddingToBlock: null }),

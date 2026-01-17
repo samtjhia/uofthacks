@@ -57,7 +57,18 @@ export default function Cockpit() {
   };
 
   const handleBackspace = () => {
-    setTypedText(typedText.slice(0, -1));
+    // Delete last word logic
+    if (!typedText) return;
+    const trimmed = typedText.trimEnd();
+    const lastSpace = trimmed.lastIndexOf(' ');
+    
+    // If no space found, delete everything (it's one word)
+    if (lastSpace === -1) {
+       setTypedText('');
+    } else {
+       // Keep everything up to the last space
+       setTypedText(trimmed.substring(0, lastSpace));
+    }
   };
 
   const wordSuggestions = suggestions.slice(0, 4);
@@ -101,10 +112,19 @@ export default function Cockpit() {
         {/* INPUT BAR + CLEAR */}
         <div className="flex-1 h-16 bg-slate-800/50 backdrop-blur-md rounded-2xl px-5 flex items-center shadow-lg border border-white/5 focus-within:bg-slate-800/80 transition-all relative group">
             <div className="flex-1 overflow-hidden flex items-center whitespace-nowrap">
-                <span className={`text-xl font-medium tracking-tight ${typedText ? 'text-white' : 'text-slate-500'}`}>
-                    {typedText || "Start typing..."}
-                </span>
-                <span className="w-0.5 h-6 bg-sky-400 ml-0.5 animate-pulse shrink-0" />
+              <span className={`text-xl font-medium tracking-tight inline-flex items-center ${typedText ? 'text-white' : 'text-slate-500'}`}>
+                {typedText ? (
+                  <>
+                    {typedText}
+                    <span className="w-0.5 h-6 bg-sky-400 ml-2 animate-pulse inline-block" />
+                  </>
+                ) : (
+                  <>
+                    <span className="w-0.5 h-6 bg-sky-400 mr-2 animate-pulse inline-block" />
+                    <span className="text-slate-500">Start typing...</span>
+                  </>
+                )}
+              </span>
             </div>
             
             {/* Clear Button - Only visible if text exists */}

@@ -10,8 +10,8 @@ export interface AppState {
   isRightSidebarOpen: boolean;
   toggleRightSidebar: () => void;
 
-  inputMode: 'text' | 'picture';
-  setInputMode: (mode: 'text' | 'picture') => void;
+  inputMode: 'text' | 'picture' | 'spark';
+  setInputMode: (mode: 'text' | 'picture' | 'spark') => void;
   
   // Data State
   typedText: string;

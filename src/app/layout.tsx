@@ -5,8 +5,8 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'ThoughtFlow',
-  description: 'The AAC Interface That Listens',
+  title: 'Chorus',
+  description: 'The Active AAC Interface',
 };
 
 export default function RootLayout({

@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
         : `1. **Signal 6 [The Filter]**: HARD CONSTRAINT. Predictions MUST start with the user's current input: "${text}". \n         - **EXCEPTION**: If input is EMPTY, predict ${outputCount} distinct conversation starters based on Schedule/History/Time.`;
 
     prompt = `
-      # Role: ThoughtFlow Predictive Component (Context-Aware AAC)
+      # Role: Chorus Predictive Component (Context-Aware AAC)
       You are an advanced predictive engine for users with speech impairments. Your job is to predict the user's *intended next word* by fusing 5 real-time context signals.
       
       # The 5 Signals (Hierarchy of Importance):

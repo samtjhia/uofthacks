@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 
 export default function LeftSidebar() {
-  const { history, fetchHistory, clearHistory, engineLogs, cacheStats, activeModel, memories, fetchMemories } = useStore((state: AppState) => state);
+  const { history, fetchHistory, clearHistory, engineLogs, cacheStats, activeModel, memories, fetchMemories, clearMemories } = useStore((state: AppState) => state);
   const [activeTab, setActiveTab] = useState<'history' | 'brain' | 'memory'>('history');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const dummyRef = useRef<HTMLDivElement>(null);
@@ -238,13 +238,22 @@ export default function LeftSidebar() {
                {/* Header / Refresh */}
                <div className="flex justify-between items-center mb-2 px-1">
                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Saved Facts</h3>
-                   <button 
-                     onClick={handleRefreshMemories}
-                     className={`p-1.5 rounded-lg hover:bg-white/5 text-slate-500 hover:text-emerald-400 transition-all ${isRefreshing ? 'animate-spin text-emerald-500' : ''}`}
-                     title="Refresh Memories"
-                   >
-                       <RefreshCw className="w-3.5 h-3.5" />
-                   </button>
+                   <div className="flex gap-2">
+                        <button 
+                            onClick={clearMemories}
+                            className="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-500 hover:text-red-400 transition-all"
+                            title="Wipe All Memories"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button 
+                            onClick={handleRefreshMemories}
+                            className={`p-1.5 rounded-lg hover:bg-white/5 text-slate-500 hover:text-emerald-400 transition-all ${isRefreshing ? 'animate-spin text-emerald-500' : ''}`}
+                            title="Refresh Memories"
+                        >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                        </button>
+                   </div>
                </div>
 
                {(!memories || memories.length === 0) && (

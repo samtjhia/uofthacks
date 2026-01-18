@@ -239,12 +239,17 @@ export async function getAllMemories(): Promise<MemoryResult[]> {
         if (!response.ok) throw new Error("API Failed");
         
         const data = await response.json();
-        return (data.memories || []).map((m: any) => ({
+        const memories = (data.memories || []).map((m: any) => ({
             id: m.id,
             text: m.content,
             relevance: 1,
             timestamp: m.created_at
         }));
+
+        // Sort Newest ("Just Now") -> Oldest
+        return memories.sort((a: any, b: any) => 
+            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
     } catch (e) {
         console.warn("Returning Local Memories (Fallback)", e);
         return MOCK_DB.map((m: any, i) => ({
@@ -253,5 +258,57 @@ export async function getAllMemories(): Promise<MemoryResult[]> {
              relevance: 1,
              timestamp: new Date().toISOString()
         }));
+    }
+}
+
+/**
+ * Deletes a single memory by ID
+ */
+export async function deleteMemory(id: string): Promise<boolean> {
+    if (id.startsWith('local-')) {
+        const index = parseInt(id.split('-')[1]);
+        if (!isNaN(index) && index >= 0 && index < MOCK_DB.length) {
+            MOCK_DB.splice(index, 1);
+            return true;
+        }
+        return false;
+    }
+
+    if (!BACKBOARD_API_KEY || !BACKBOARD_ASSISTANT_ID) return false;
+
+    try {
+        const url = `${BACKBOARD_API_URL}/assistants/${BACKBOARD_ASSISTANT_ID}/memories/${id}`;
+        const response = await fetch(url, {
+            method: 'DELETE',
+            headers: {
+                'X-API-Key': BACKBOARD_API_KEY
+            }
+        });
+        return response.ok;
+    } catch (e) {
+        console.error("Failed to delete memory", e);
+        return false;
+    }
+}
+
+/**
+ * Deletes ALL memories
+ */
+export async function deleteAllMemories(): Promise<void> {
+    // Clear Local
+    MOCK_DB.length = 0;
+
+    // Clear Remote
+    if (!BACKBOARD_API_KEY || !BACKBOARD_ASSISTANT_ID) return;
+
+    try {
+        const memories = await getAllMemories();
+        const remoteMemories = memories.filter(m => !m.id.startsWith('local-'));
+        
+        // Parallel deletion
+        await Promise.all(remoteMemories.map(m => deleteMemory(m.id)));
+        console.log(`[Memory] Deleted ${remoteMemories.length} remote memories.`);
+    } catch (e) {
+        console.error("Failed to clear all memories", e);
     }
 }

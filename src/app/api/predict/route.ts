@@ -16,7 +16,8 @@ export async function POST(req: NextRequest) {
         // Optimization: We could use an LLM to extract keywords first, but raw search works for hackathons
         const memories = await searchMemory(lastPartnerMessage);
         if (memories.length > 0) {
-            memoryContext = memories.map(m => `"${m.text}"`).join('; ');
+            // Join with specific separators to prevent hallucinated merging
+            memoryContext = memories.map((m, i) => `Fact ${i+1}: "${m.text}"`).join('\n');
             console.log("🧠 Memory Hit:", memoryContext);
         } else {
             console.log("🤷‍♂️ Memory Miss: No relevant memories found.");
@@ -50,7 +51,8 @@ export async function POST(req: NextRequest) {
       1. **Signal 6 [The Filter]**: HARD CONSTRAINT. Predictions MUST start with the current input: "${text}". 
          - **EXCEPTION**: If input is EMPTY, predict 4 distinct conversation starters or RESPONSES based on History.
       2. **Signal 1 [The Listener]**: **CRITICAL - MAXIMUM PRIORITY**. If the last history message is from 'partner' or is a QUESTION, your main job is to answer it. Ignoring a direct question is a failure.
-      3. **Signal 3 [The Memory]**: Long-Term Info. Use this to answer specific factual questions (e.g., "When is the wedding?").
+      3. **Signal 3 [The Memory]**: Long-Term Info. Use this to answer specific factual questions (e.g., "When is the wedding?"). 
+         - **WARNING**: Treat each retrieved Fact as ATOMIC. Do NOT merge unrelated facts (e.g. do not combine "I work at X" with "My favorite color is Y" unless the user asks for both).
       4. **Signal 4 [The Habits]**: High Priority. Users repeat themselves. If a frequent habit matches the input/context, it wins.
       5. **Signal 2 [The Scheduler]**: Context Booster. If the schedule says "Art Class", boost words like "paint", "color", "canvas".
       6. **Signal 5 [The Grammar]**: Syntactic Validity. Ensure the sentence makes grammatical sense.

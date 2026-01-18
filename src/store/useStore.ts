@@ -96,6 +96,7 @@ export interface AppState {
   fetchHistory: () => Promise<void>;
   clearHistory: () => Promise<void>; 
   fetchMemories: () => Promise<void>; // <--- New Action
+  clearMemories: () => Promise<void>;
   fetchSuggestions: (onlySignals?: boolean) => Promise<void>;
   fetchSchedule: () => Promise<void>;
   addScheduleItem: (label: string, timeBlock: 'morning' | 'afternoon' | 'evening', startTime?: string, durationMinutes?: number) => Promise<void>;
@@ -389,6 +390,18 @@ export const useStore = create<AppState>((set, get) => ({
         }
     } catch (err) {
         console.error('Failed to fetch memories', err);
+    }
+  },
+
+  clearMemories: async () => {
+    try {
+        if (!window.confirm("Are you sure you want to Wipe All Long-Term Memories? This cannot be undone.")) return;
+        
+        set({ memories: [] }); // Optimistic
+        await fetch('/api/memories', { method: 'DELETE' });
+        get().addEngineLog('Memory wiped', 'success');
+    } catch (err) {
+        console.error("Failed to clear memories", err);
     }
   },
 

@@ -11,7 +11,11 @@ import { TimePicker } from './TimePicker';
 import { speakText } from '@/lib/elevenlabs';
 
 export default function Cockpit() {
-  const { isListening, inputMode, setInputMode, typedText, setTypedText, isPredicting, suggestions, addHistoryItem, reinforceHabit, schedulerAddingToBlock, setSchedulerAddingToBlock, addScheduleItem } = useStore();
+  const { 
+    isListening, inputMode, setInputMode, typedText, setTypedText, isPredicting, suggestions, 
+    addHistoryItem, reinforceHabit, schedulerAddingToBlock, setSchedulerAddingToBlock, addScheduleItem,
+    isHighlightEnabled, toggleHighlight 
+  } = useStore();
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [pendingLabel, setPendingLabel] = useState('');
 
@@ -22,6 +26,11 @@ export default function Cockpit() {
 
       const state = useStore.getState();
       const currentText = state.typedText;
+
+      // Auto-switch to text mode on typing if in spark mode
+      if (state.inputMode === 'spark' && (e.key.length === 1 || e.key === 'Backspace')) {
+        state.setInputMode('text');
+      }
 
       if (e.key === 'Backspace') {
         state.setTypedText(currentText.slice(0, -1));
@@ -127,9 +136,11 @@ export default function Cockpit() {
   ];
 
   // Logic update: Trust the store's suggestions (which now come from Grammar and Gemini).
-  // CRITICAL: User requirement - If input is empty (or just whitespace), ALWAYS show defaults in bubbles.
+  // CRITICAL UPDATE: If input is empty, we default to [Yes, No, Hi, Thanks]...
+  // UNLESS we have high-quality predictions from the "Brain" because the partner just spoke.
+  // We can detect this if 'suggestions' are populated even when typedText is empty.
   const wordSuggestions = (!typedText || typedText.trim() === '')
-    ? DEFAULTS
+    ? (suggestions.length > 0 && !suggestions[0].id.startsWith('grammar-') ? suggestions.slice(0, 4) : DEFAULTS)
     : suggestions.slice(0, 4);
 
   return (
@@ -164,19 +175,52 @@ export default function Cockpit() {
                 </button>
             ))}
         </div>
+
+        {/* AI ASSIST TOGGLE (Only in Picture Mode) */}
+        {inputMode === 'picture' && (
+             <button 
+               onClick={toggleHighlight}
+               className={`ml-3 h-12 flex items-center gap-3 px-4 rounded-2xl border transition-all duration-300 ${
+                 isHighlightEnabled 
+                 ? 'bg-sky-500/10 border-sky-500/30' 
+                 : 'bg-slate-800/50 border-white/5 hover:bg-slate-800'
+               }`}
+             >
+                <div className="flex flex-col items-start gap-0.5">
+                    <span className={`text-[10px] font-bold uppercase tracking-wider leading-none ${isHighlightEnabled ? 'text-sky-400' : 'text-slate-400'}`}>
+                        AI Assist
+                    </span>
+                    <span className="text-[10px] opacity-60 leading-none text-slate-400">
+                        {isHighlightEnabled ? 'Active' : 'Off'}
+                    </span>
+                </div>
+                
+                {/* Switch Graphic */}
+                <div className={`w-10 h-5 rounded-full relative transition-colors duration-300 ${
+                    isHighlightEnabled ? 'bg-sky-500' : 'bg-slate-700'
+                }`}>
+                    <div className={`absolute top-1 w-3 h-3 rounded-full bg-white shadow-sm transition-all duration-300 ${
+                        isHighlightEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                </div>
+             </button>
+        )}
       </div>
 
       {/* MIDDLE ROW (Input) */}
       {(inputMode !== 'schedule' || schedulerAddingToBlock) && (
       <div className="shrink-0 px-6 pb-4 flex items-stretch gap-3">
         {/* INPUT BAR + CLEAR */}
-        <div className="flex-1 h-16 bg-slate-800/50 backdrop-blur-md rounded-2xl px-5 flex items-center shadow-lg border border-white/5 focus-within:bg-slate-800/80 transition-all relative group">
+        <div 
+            onClick={() => inputMode === 'spark' && setInputMode('text')}
+            className="flex-1 h-16 bg-slate-800/50 backdrop-blur-md rounded-2xl px-5 flex items-center shadow-lg border border-white/5 focus-within:bg-slate-800/80 transition-all relative group cursor-text"
+        >
             <div className="flex-1 overflow-hidden flex items-center whitespace-nowrap">
               <span className={`text-xl font-medium tracking-tight inline-flex items-center ${typedText ? 'text-white' : 'text-slate-500'}`}>
                 {typedText ? (
                   <>
                     {typedText}
-                    <span className="w-0.5 h-6 bg-sky-400 ml-2 animate-pulse inline-block" />
+                    <span className="w-0.5 h-6 bg-sky-400 ml-[2px] animate-pulse inline-block" />
                   </>
                 ) : (
                   <>
@@ -303,21 +347,47 @@ export default function Cockpit() {
                      <SchedulerView />
                 </div>
               ) : (
-                <div className="h-full w-full flex flex-col items-center justify-center text-slate-500 gap-4">
-                    <div className="w-20 h-20 rounded-full bg-sky-500/10 border border-sky-500/20 flex items-center justify-center animate-pulse">
-                        <Activity className="w-8 h-8 text-sky-400" />
-                    </div>
-                    <div className="text-center">
+                <div className="h-full w-full flex flex-col items-center justify-center text-slate-500 gap-4 p-6 pt-24">
+                    <div className="text-center mb-2">
                         <h3 className="text-lg font-medium text-sky-300">Spark Mode</h3>
-                        <p className="text-sm opacity-60">Neural predictive text engine</p>
+                        <p className="text-sm opacity-60">Neural conversation starters</p>
                     </div>
+
+                    {isPredicting ? (
+                       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full h-full overflow-y-auto pb-4 content-start">
+                           {[1,2,3,4,5,6,7,8,9,10,11,12].map(i => (
+                               <div key={i} className="rounded-2xl bg-slate-800/50 border border-slate-700/50 animate-pulse min-h-[110px]" />
+                           ))}
+                       </div>
+                    ) : (
+                         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full h-full overflow-y-auto pb-4 content-start">
+                            {suggestions.slice(0, 12).map((sug) => (
+                                <button
+                                    key={sug.id}
+                                    onClick={() => {
+                                      setTypedText(sug.text);
+                                      setInputMode('text');
+                                    }}
+                                    className="relative group p-4 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 hover:border-sky-500/30 transition-all flex flex-col justify-between gap-2 text-left min-h-[110px]"
+                                >
+                                    <div className="flex items-center justify-between w-full">
+                                        <span className="text-sky-400 font-bold text-xs tracking-wide uppercase truncate pr-2 opacity-90">{sug.label}</span>
+                                        <Volume2 className="w-3.5 h-3.5 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                                    </div>
+                                    <p className="text-slate-100 font-medium text-sm sm:text-base leading-snug line-clamp-3">
+                                        {sug.text}
+                                    </p>
+                                    <div className="absolute inset-0 rounded-2xl ring-1 ring-sky-500/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </button>
+                            ))}
+                         </div>
+                    )}
                 </div>
               )}
            </div>
       </div>
       {showTimePicker && (
         <TimePicker 
-          initialTime={getInitialTimeForBlock()}
           initialDuration={30}
           onConfirm={handleTimeConfirm}
           onCancel={() => setShowTimePicker(false)}

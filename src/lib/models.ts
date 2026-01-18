@@ -60,3 +60,24 @@ const ScheduleSchema = new Schema<IScheduleItem>({
 });
 
 export const ScheduleItem: Model<IScheduleItem> = mongoose.models.ScheduleItem || mongoose.model<IScheduleItem>('ScheduleItem', ScheduleSchema);
+
+// --- SIGNAL 5: TRANSITIONS (Learn Next Word) ---
+// Tracks context -> next word probabilities
+interface ITransition {
+  context: string; // The previous word (e.g. "want")
+  next: string;    // The prediction (e.g. "water")
+  count: number;   // Frequency
+  lastUsed: Date;
+}
+
+const TransitionSchema = new Schema<ITransition>({
+  context: { type: String, required: true, index: true },
+  next: { type: String, required: true },
+  count: { type: Number, default: 0 },
+  lastUsed: { type: Date, default: Date.now }
+});
+
+// Create compound index for faster lookups
+TransitionSchema.index({ context: 1, count: -1 });
+
+export const Transition: Model<ITransition> = mongoose.models.Transition || mongoose.model<ITransition>('Transition', TransitionSchema);

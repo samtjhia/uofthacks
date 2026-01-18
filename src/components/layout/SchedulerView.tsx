@@ -212,9 +212,7 @@ export default function SchedulerView() {
                                   <span className="text-[10px] font-bold uppercase text-white/40 group-hover/time:text-white/80">Set Time</span>
                                </button>
                             )}
-                            <span className={`font-medium text-lg leading-snug truncate w-full ${isNow ? 'text-emerald-100' : ''}`}>{task.label}</span>
-                            
-                            {isNow && <span className="absolute right-12 text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-900/50 px-2 py-1 rounded animate-pulse">Now</span>}
+                            <span className={`font-medium text-lg leading-snug truncate flex-1 text-left ${isNow ? 'text-emerald-100' : ''}`}>{task.label}</span>
                         </button>
                         
                         {/* Delete Button (Visible on Hover) */}
@@ -263,7 +261,7 @@ export default function SchedulerView() {
 
       {editingItem && (
         <TimePicker 
-          initialTime={editingItem.startTime || '12:00'}
+          initialTime={editingItem.startTime}
           initialDuration={editingItem.durationMinutes || 30}
           onConfirm={(time, duration) => {
             updateScheduleItem(editingItem._id, { startTime: time, durationMinutes: duration });

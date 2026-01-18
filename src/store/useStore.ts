@@ -8,7 +8,7 @@ let debounceTimer: ReturnType<typeof setTimeout>;
 let predictionCache = new Map<string, SuggestionResponse[]>();
 const MAX_CACHE_SIZE = 200; // Increased to 200 to allow for extensive history
 const PREDICTION_DEBOUNCE_MS = 300; // Fast response
-const CACHE_KEY_STORAGE = 'gemini_prediction_cache_v3'; // Persists across reloads
+const CACHE_KEY_STORAGE = 'gemini_prediction_cache_v5'; // Persists across reloads
 
 // Load cache from localStorage (client-side only)
 if (typeof window !== 'undefined') {
@@ -45,6 +45,9 @@ export interface AppState {
   toggleLeftSidebar: () => void;
   isRightSidebarOpen: boolean;
   toggleRightSidebar: () => void;
+  // AI Assist
+  isHighlightEnabled: boolean;
+  toggleHighlight: () => void;
   
   // Audio State
   audioLevel: number;
@@ -53,6 +56,8 @@ export interface AppState {
   toggleAutoMode: () => void;
   isSpeaking: boolean;
   setIsSpeaking: (isSpeaking: boolean) => void;
+  speechTone: 'neutral' | 'happy' | 'serious' | 'empathic';
+  setSpeechTone: (tone: 'neutral' | 'happy' | 'serious' | 'empathic') => void;
 
   inputMode: 'text' | 'picture' | 'spark' | 'schedule';
   setInputMode: (mode: 'text' | 'picture' | 'spark' | 'schedule') => void;
@@ -83,6 +88,11 @@ export interface AppState {
   engineLogs: { id: string, timestamp: string, message: string, type: 'info' | 'success' | 'warning' | 'error' }[];
   addEngineLog: (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
   cacheStats: { size: number, max: number };
+  memories: { id: string; text: string; timestamp: string }[]; // <--- New State
+  
+  // Admin Features
+  adminProvider: 'gemini' | 'openai' | null;
+  setAdminProvider: (provider: 'gemini' | 'openai' | null) => void;
 
   // Actions
   addHistoryItem: (item: ChatMessage) => Promise<void>;
@@ -91,12 +101,16 @@ export interface AppState {
 
   // Async Actions
   fetchHistory: () => Promise<void>;
+  clearHistory: () => Promise<void>; 
+  fetchMemories: () => Promise<void>; // <--- New Action
+  clearMemories: () => Promise<void>;
   fetchSuggestions: (onlySignals?: boolean) => Promise<void>;
   fetchSchedule: () => Promise<void>;
   addScheduleItem: (label: string, timeBlock: 'morning' | 'afternoon' | 'evening', startTime?: string, durationMinutes?: number) => Promise<void>;
   updateScheduleItem: (id: string, updates: Partial<ScheduleItem>) => Promise<void>;
   deleteScheduleItem: (id: string) => Promise<void>;
   reinforceHabit: (text: string) => Promise<void>;
+  learnTransition: (context: string, next: string) => Promise<void>;
 }
 
 // MOCK DATA (Empty initially to trigger Defaults)
@@ -111,6 +125,9 @@ export const useStore = create<AppState>((set, get) => ({
   toggleLeftSidebar: () => set((state) => ({ isLeftSidebarOpen: !state.isLeftSidebarOpen })),
   isRightSidebarOpen: true,
   toggleRightSidebar: () => set((state) => ({ isRightSidebarOpen: !state.isRightSidebarOpen })),
+  
+  isHighlightEnabled: true,
+  toggleHighlight: () => set((state) => ({ isHighlightEnabled: !state.isHighlightEnabled })),
 
   audioLevel: 0,
   setAudioLevel: (level) => set({ audioLevel: level }),
@@ -118,11 +135,21 @@ export const useStore = create<AppState>((set, get) => ({
   toggleAutoMode: () => set((state) => ({ isAutoMode: !state.isAutoMode })),
   isSpeaking: false,
   setIsSpeaking: (isSpeaking) => set({ isSpeaking }),
+  speechTone: 'neutral',
+  setSpeechTone: (tone) => set({ speechTone: tone }),
 
   inputMode: 'text',
-  setInputMode: (mode) => set({ inputMode: mode, schedulerAddingToBlock: null }),
+  setInputMode: (mode) => {
+    set({ inputMode: mode, schedulerAddingToBlock: null });
+    if (mode === 'spark') {
+        get().refreshPredictions('');
+    }
+  },
   
   typedText: '',
+  adminProvider: null,
+  setAdminProvider: (p) => set({ adminProvider: p }),
+  memories: [], // Init empty
   pictureCategory: null,
   setPictureCategory: (cat) => set({ pictureCategory: cat }),
   setTypedText: (text) => {
@@ -152,14 +179,18 @@ export const useStore = create<AppState>((set, get) => ({
 
   // EXPOSED PREDICTION FUNCTION (For Manual Triggering)
   refreshPredictions: async (textOverride?: string) => {
-        const text = textOverride !== undefined ? textOverride : get().typedText;
+        const state = get();
+        const inputMode = state.inputMode;
+        const isSpark = inputMode === 'spark';
+
+        // Use typed text if override not provided. Spark mode relies on setInputMode passing '' if it wants to clear.
+        const text = (textOverride !== undefined ? textOverride : state.typedText);
         
         // Start Loading State
         set({ isPredicting: true });
 
         try {
-            get().addEngineLog(`⏳ Engine Activated. Reason: ${text ? 'Typing' : 'Zero-Shot Context'}...`, 'info');
-            const state = get();
+            get().addEngineLog(`⏳ Engine Activated. Reason: ${isSpark ? 'Spark Mode' : (text ? 'Typing' : 'Zero-Shot Context')}...`, 'info');
             
             // PREPARE SIGNALS (Early for Cache Key)
             const now = new Date();
@@ -167,11 +198,21 @@ export const useStore = create<AppState>((set, get) => ({
             const relevantSchedule = state.scheduleItems.map(i => `${i.timeBlock}: ${i.label}`).join(', ');
 
             // Get recent history for context (last 3 messages is usually enough for immediate context)
+            // UPDATE: Send history even in Spark mode so it knows the conversation flow (Signal 1)
             const recentHistory = state.history.slice(-3).map(m => `${m.role}: ${m.content}`).join('\n');
             
+            // EXTRACT LAST PARTNER MESSAGE (Signal 1 - Explicit)
+            // Look for the last message that is NOT from the user.
+            const lastPartnerMsgObj = [...state.history].reverse().find(m => m.role !== 'user');
+            // CLEANUP: Remove "Partner: " prefix if present, to give clean text to the Brain
+            const rawPartnerContent = lastPartnerMsgObj ? lastPartnerMsgObj.content : null;
+            const lastPartnerMessage = rawPartnerContent 
+               ? rawPartnerContent.replace(/^Partner:\s*"/, '').replace(/"$/, '').replace(/^Partner:\s*/, '')
+               : null;
+
             // FIX: Do NOT trim text. "so" (completions) and "so " (next word) are different states.
             // Cache Key now includes Schedule to differentiate contexts (e.g. Beach vs Home)
-            const cacheKey = `${text}|${recentHistory}|${relevantSchedule}`; 
+            const cacheKey = `${isSpark ? 'SPARK' : 'PREDICT'}|${text}|${recentHistory}|${relevantSchedule}`; 
 
             // CHECK CACHE FIRST
             if (predictionCache.has(cacheKey)) {
@@ -193,12 +234,16 @@ export const useStore = create<AppState>((set, get) => ({
                 body: JSON.stringify({ 
                     text, 
                     history: recentHistory,
+                    mode: isSpark ? 'spark' : 'predict',
+                    lastPartnerMessage, // Explicitly pass the detected partner message
                     // New Context Signals
                     time: timeString,
                     userProfile: state.userProfile,
                     schedule: relevantSchedule,
                     // Signal 4: Top 20 Habits
-                    habits: state.habits.slice(0, 20)
+                    habits: state.habits.slice(0, 20),
+                    // Admin Override
+                    provider: state.adminProvider
                 })
             });
 
@@ -260,12 +305,37 @@ export const useStore = create<AppState>((set, get) => ({
   addHistoryItem: async (item) => {
     // Optimistic update
     set((state) => ({ history: [...state.history, item] }));
+    
+    // TRIGGER: If the new item is from 'assistant' (Partner), immediately predict responses
+    if (item.role === 'user') { // wait. The 'Listening' usually adds as 'user' or 'partner'? 
+       // In this app, 'user' is Samantha (the AAC user). 'assistant' is usually the AI response... 
+       // BUT, the 'Listener' (Microphone) detects the *other* person.
+       // Let's check how 'Listener' adds items. Usually listening adds as 'system' or 'partner' or 'assistant'.
+       // Assuming standard chat: user = me, assistant = them.
+       // Actually, chat history usually puts user = Me, assistant = AI. 
+       // For a conversation aid, "Listener" input should probably be logged as 'assistant' (The Interlocutor).
+    }
+
     try {
       await fetch('/api/history', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: item.role, content: item.content }),
       });
+      
+      // AUTO-PREDICT TRIGGER
+      // If the message was added by the "Partner" (assistant role in this context, or however we map it),
+      // we should trigger a prediction for the User ("user" role).
+      // Let's verify who is who. If the app listens to "What is your name?", that is the PARTNER speaking.
+      // So if (item.role !== 'user') -> Trigger refreshPredictions()
+      if (item.role !== 'user') {
+          // Verify we aren't already typing
+          const currentText = get().typedText;
+          if (!currentText) {
+             get().refreshPredictions(''); // Zero-shot prediction based on this new history
+          }
+      }
+
     } catch (error) {
       console.error('Failed to save history item:', error);
     }
@@ -326,7 +396,42 @@ export const useStore = create<AppState>((set, get) => ({
       console.error('Failed to fetch suggestions:', error);
     }
   },
-fetchSchedule: async () => {
+
+  clearHistory: async () => {
+    try {
+        set({ history: [] }); // Optimistic clear
+        await fetch('/api/history', { method: 'DELETE' });
+        get().addEngineLog('History cleared', 'success');
+    } catch (err) {
+        console.error("Failed to clear history", err);
+    }
+  },
+
+  fetchMemories: async () => {
+    try {
+        const res = await fetch('/api/memories');
+        const data = await res.json();
+        if (data.memories) {
+            set({ memories: data.memories });
+        }
+    } catch (err) {
+        console.error('Failed to fetch memories', err);
+    }
+  },
+
+  clearMemories: async () => {
+    try {
+        if (!window.confirm("Are you sure you want to Wipe All Long-Term Memories? This cannot be undone.")) return;
+        
+        set({ memories: [] }); // Optimistic
+        await fetch('/api/memories', { method: 'DELETE' });
+        get().addEngineLog('Memory wiped', 'success');
+    } catch (err) {
+        console.error("Failed to clear memories", err);
+    }
+  },
+
+  fetchSchedule: async () => {
     try {
       const res = await fetch('/api/schedule');
       if (res.ok) {
@@ -396,6 +501,24 @@ fetchSchedule: async () => {
       });
     } catch (error) {
       console.error('Failed to reinforce habit:', error);
+    }
+  },
+
+  learnTransition: async (context: string, next: string) => {
+    try {
+      if (!context || !next) return;
+      
+      // Log learning
+      get().addEngineLog(`🧠 Knowledge Updated: "${context}" -> "${next}"`, 'info');
+
+      // Update DB for future Reflex use
+      fetch('/api/learn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ context, next }),
+      }).catch(err => console.error("Learn fetch error:", err));
+    } catch (error) {
+      console.error('Failed to learn transition behavior:', error);
     }
   },
 }));

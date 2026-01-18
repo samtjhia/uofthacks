@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '@/store/useStore';
 import CategoryGrid from './CategoryGrid';
 import { 
@@ -97,132 +98,131 @@ const QUICK = [
   { id: 'toilet', label: 'Toilet', icon: Bath, color: 'text-cyan-400' },
   { id: 'happy', label: 'Happy', icon: Smile, color: 'text-yellow-400' },
   { id: 'sad', label: 'Sad', icon: Moon, color: 'text-indigo-300' },
-  { id: 'home', label: 'Home', icon: Home, color: 'text-emerald-400' },
-  { id: 'play', label: 'Play', icon: Play, color: 'text-lime-400' },
+  { id: 'home', label: 'Home', icon: Home, color: 'text-emerald-500' },
+  { id: 'play', label: 'Play', icon: Play, color: 'text-lime-500' },
 ];
 
 const WORD_COLORS: Record<string, string> = {
-  // Pronouns / People -> Yellow/Orange
-  'I': 'bg-amber-400 text-slate-900 border-amber-500', 
-  'you': 'bg-amber-400 text-slate-900 border-amber-500', 
-  'we': 'bg-amber-400 text-slate-900 border-amber-500', 
-  'who': 'bg-amber-400 text-slate-900 border-amber-500', // Sometimes considered pronoun or question.
-  'me': 'bg-amber-400 text-slate-900 border-amber-500',
-  'us': 'bg-amber-400 text-slate-900 border-amber-500',
+  // Pronouns / People -> Yellow/Orange (Clay: Amber)
+  'I': 'bg-amber-100/80 text-amber-900 border-amber-200/60', 
+  'you': 'bg-amber-100/80 text-amber-900 border-amber-200/60', 
+  'we': 'bg-amber-100/80 text-amber-900 border-amber-200/60', 
+  'who': 'bg-amber-100/80 text-amber-900 border-amber-200/60', 
+  'me': 'bg-amber-100/80 text-amber-900 border-amber-200/60',
+  'us': 'bg-amber-100/80 text-amber-900 border-amber-200/60',
 
-  // Verbs -> Pink
-  'is': 'bg-pink-400 text-slate-900 border-pink-500',
-  'can': 'bg-pink-400 text-slate-900 border-pink-500',
-  'will': 'bg-pink-400 text-slate-900 border-pink-500',
-  'do': 'bg-pink-400 text-slate-900 border-pink-500',
-  'have': 'bg-pink-400 text-slate-900 border-pink-500',
-  'want': 'bg-pink-400 text-slate-900 border-pink-500',
-  'like': 'bg-pink-400 text-slate-900 border-pink-500',
-  'need': 'bg-pink-400 text-slate-900 border-pink-500',
-  'get': 'bg-pink-400 text-slate-900 border-pink-500',
-  'play': 'bg-pink-400 text-slate-900 border-pink-500',
-  'help': 'bg-pink-400 text-slate-900 border-pink-500',
-  'stop': 'bg-pink-400 text-slate-900 border-pink-500', // Often red/stop sign... overriding to pink as requested
+  // Verbs -> Pink (Clay: Rose)
+  'is': 'bg-rose-100/80 text-rose-900 border-rose-200/60',
+  'can': 'bg-rose-100/80 text-rose-900 border-rose-200/60',
+  'will': 'bg-rose-100/80 text-rose-900 border-rose-200/60',
+  'do': 'bg-rose-100/80 text-rose-900 border-rose-200/60',
+  'have': 'bg-rose-100/80 text-rose-900 border-rose-200/60',
+  'want': 'bg-rose-100/80 text-rose-900 border-rose-200/60',
+  'like': 'bg-rose-100/80 text-rose-900 border-rose-200/60',
+  'need': 'bg-rose-100/80 text-rose-900 border-rose-200/60',
+  'get': 'bg-rose-100/80 text-rose-900 border-rose-200/60',
+  'play': 'bg-rose-100/80 text-rose-900 border-rose-200/60',
+  'help': 'bg-rose-100/80 text-rose-900 border-rose-200/60',
+  'stop': 'bg-rose-100/80 text-rose-900 border-rose-200/60', 
   
-  // Questions -> White/Grey or dedicated
-  'what': 'bg-slate-200 text-slate-900 border-slate-300',
-  'where': 'bg-slate-200 text-slate-900 border-slate-300',
-  'when': 'bg-slate-200 text-slate-900 border-slate-300',
-  'why': 'bg-slate-200 text-slate-900 border-slate-300',
+  // Questions -> Clay/Grey
+  'what': 'bg-white/90 text-clay-900 border-clay-200',
+  'where': 'bg-white/90 text-clay-900 border-clay-200',
+  'when': 'bg-white/90 text-clay-900 border-clay-200',
+  'why': 'bg-white/90 text-clay-900 border-clay-200',
 
-  // Prepositions / Little words -> Green
-  'to': 'bg-lime-400 text-slate-900 border-lime-500',
-  'with': 'bg-lime-400 text-slate-900 border-lime-500',
-  'in': 'bg-lime-400 text-slate-900 border-lime-500',
-  'on': 'bg-lime-400 text-slate-900 border-lime-500',
-  'off': 'bg-lime-400 text-slate-900 border-lime-500',
-  'for': 'bg-lime-400 text-slate-900 border-lime-500',
-  'at': 'bg-lime-400 text-slate-900 border-lime-500',
-  'here': 'bg-lime-400 text-slate-900 border-lime-500',
-  'there': 'bg-lime-400 text-slate-900 border-lime-500',
+  // Prepositions / Little words -> Lime
+  'to': 'bg-lime-100/80 text-lime-900 border-lime-200/60',
+  'with': 'bg-lime-100/80 text-lime-900 border-lime-200/60',
+  'in': 'bg-lime-100/80 text-lime-900 border-lime-200/60',
+  'on': 'bg-lime-100/80 text-lime-900 border-lime-200/60',
+  'off': 'bg-lime-100/80 text-lime-900 border-lime-200/60',
+  'for': 'bg-lime-100/80 text-lime-900 border-lime-200/60',
+  'at': 'bg-lime-100/80 text-lime-900 border-lime-200/60',
+  'here': 'bg-lime-100/80 text-lime-900 border-lime-200/60',
+  'there': 'bg-lime-100/80 text-lime-900 border-lime-200/60',
 
-  // Adjectives -> Blue
-  'good': 'bg-sky-400 text-slate-900 border-sky-500',
-  'bad': 'bg-sky-400 text-slate-900 border-sky-500',
-  'more': 'bg-sky-400 text-slate-900 border-sky-500', // same as good
-  'not': 'bg-sky-400 text-slate-900 border-sky-500', // same as good
+  // Adjectives -> Blue (Clay: Azure)
+  'good': 'bg-azure-100/80 text-azure-900 border-azure-200/60',
+  'bad': 'bg-azure-100/80 text-azure-900 border-azure-200/60',
+  'more': 'bg-azure-100/80 text-azure-900 border-azure-200/60', 
+  'not': 'bg-azure-100/80 text-azure-900 border-azure-200/60', 
 
-  // Time -> Brown/Orange/Blue
-  'now': 'bg-sky-400 text-slate-900 border-sky-500', // same as good
-  'all done': 'bg-sky-400 text-slate-900 border-sky-500', // same as good
+  // Time -> Azure
+  'now': 'bg-azure-100/80 text-azure-900 border-azure-200/60', 
+  'all done': 'bg-azure-100/80 text-azure-900 border-azure-200/60', 
   
   // New items from Rows 3-5
-  'he': 'bg-amber-400 text-slate-900 border-amber-500',
-  'she': 'bg-amber-400 text-slate-900 border-amber-500',
-  'they': 'bg-amber-400 text-slate-900 border-amber-500',
-  'it': 'bg-amber-400 text-slate-900 border-amber-500', // yellow in AAC
-  'this': 'bg-amber-400 text-slate-900 border-amber-500',
-  'that': 'bg-amber-400 text-slate-900 border-amber-500',
+  'he': 'bg-amber-100/80 text-amber-900 border-amber-200/60',
+  'she': 'bg-amber-100/80 text-amber-900 border-amber-200/60',
+  'they': 'bg-amber-100/80 text-amber-900 border-amber-200/60',
+  'it': 'bg-amber-100/80 text-amber-900 border-amber-200/60', 
+  'this': 'bg-amber-100/80 text-amber-900 border-amber-200/60',
+  'that': 'bg-amber-100/80 text-amber-900 border-amber-200/60',
   
-  'go': 'bg-pink-400 text-slate-900 border-pink-500', // same as is
-  'come': 'bg-pink-400 text-slate-900 border-pink-500',
-  'take': 'bg-pink-400 text-slate-900 border-pink-500',
-  'see': 'bg-pink-400 text-slate-900 border-pink-500',
-  'look': 'bg-pink-400 text-slate-900 border-pink-500',
-  'put': 'bg-pink-400 text-slate-900 border-pink-500',
-  'make': 'bg-pink-400 text-slate-900 border-pink-500',
-  'think': 'bg-pink-400 text-slate-900 border-pink-500',
-  'know': 'bg-pink-400 text-slate-900 border-pink-500',
-  'say': 'bg-pink-400 text-slate-900 border-pink-500',
-  'give': 'bg-pink-400 text-slate-900 border-pink-500',
+  'go': 'bg-rose-100/80 text-rose-900 border-rose-200/60', 
+  'come': 'bg-rose-100/80 text-rose-900 border-rose-200/60',
+  'take': 'bg-rose-100/80 text-rose-900 border-rose-200/60',
+  'see': 'bg-rose-100/80 text-rose-900 border-rose-200/60',
+  'look': 'bg-rose-100/80 text-rose-900 border-rose-200/60',
+  'put': 'bg-rose-100/80 text-rose-900 border-rose-200/60',
+  'make': 'bg-rose-100/80 text-rose-900 border-rose-200/60',
+  'think': 'bg-rose-100/80 text-rose-900 border-rose-200/60',
+  'know': 'bg-rose-100/80 text-rose-900 border-rose-200/60',
+  'say': 'bg-rose-100/80 text-rose-900 border-rose-200/60',
+  'give': 'bg-rose-100/80 text-rose-900 border-rose-200/60',
   
-  'out': 'bg-lime-400 text-slate-900 border-lime-500',
-  'of': 'bg-lime-400 text-slate-900 border-lime-500',
-  'up': 'bg-lime-400 text-slate-900 border-lime-500',
-  'down': 'bg-lime-400 text-slate-900 border-lime-500',
+  'out': 'bg-lime-100/80 text-lime-900 border-lime-200/60',
+  'of': 'bg-lime-100/80 text-lime-900 border-lime-200/60',
+  'up': 'bg-lime-100/80 text-lime-900 border-lime-200/60',
+  'down': 'bg-lime-100/80 text-lime-900 border-lime-200/60',
   
-  'different': 'bg-sky-400 text-slate-900 border-sky-500',
-  'all': 'bg-sky-400 text-slate-900 border-sky-500',
-  'some': 'bg-sky-400 text-slate-900 border-sky-500',
+  'different': 'bg-azure-100/80 text-azure-900 border-azure-200/60',
+  'all': 'bg-azure-100/80 text-azure-900 border-azure-200/60',
+  'some': 'bg-azure-100/80 text-azure-900 border-azure-200/60',
 
-  'about': 'bg-white text-slate-900 border-slate-300',
-  'and': 'bg-white text-slate-900 border-slate-300', // often conjunctions are white/grey
-  'because': 'bg-white text-slate-900 border-slate-300',
-  'but': 'bg-white text-slate-900 border-slate-300', 
+  'about': 'bg-white/80 text-clay-900 border-clay-200/60',
+  'and': 'bg-white/80 text-clay-900 border-clay-200/60', 
+  'because': 'bg-white/80 text-clay-900 border-clay-200/60',
+  'but': 'bg-white/80 text-clay-900 border-clay-200/60', 
   
-  'the': 'bg-orange-400 text-slate-900 border-orange-500',
-  'a': 'bg-orange-400 text-slate-900 border-orange-500',
+  'the': 'bg-orange-100/80 text-orange-900 border-orange-200/60',
+  'a': 'bg-orange-100/80 text-orange-900 border-orange-200/60',
 
   // Quick / Common Items (Mixed categories)
-  'yes': 'bg-emerald-400 text-slate-900 border-emerald-500',
-  'no': 'bg-rose-400 text-slate-900 border-rose-500',
+  'yes': 'bg-emerald-100 text-emerald-900 border-emerald-200/60',
+  'no': 'bg-rose-100 text-crimson border-rose-200/60',
   
-  // Needs -> Orange/Yellow range
-  'hungry': 'bg-violet-400 text-slate-900 border-violet-500',
-  'thirsty': 'bg-violet-400 text-slate-900 border-violet-500',
-  'toilet': 'bg-violet-400 text-slate-900 border-violet-500',
-  'sleep': 'bg-indigo-200 text-slate-900 border-indigo-300',
+  // Needs -> Purple/Indigo
+  'hungry': 'bg-violet-100/80 text-violet-900 border-violet-200/60',
+  'thirsty': 'bg-violet-100/80 text-violet-900 border-violet-200/60',
+  'toilet': 'bg-violet-100/80 text-violet-900 border-violet-200/60',
+  'sleep': 'bg-indigo-100/80 text-indigo-900 border-indigo-200/60',
   
   // Feelings -> Yellow/Blue
-  'happy': 'bg-yellow-300 text-slate-900 border-yellow-400',
-  'sad': 'bg-indigo-300 text-slate-900 border-indigo-400',
+  'happy': 'bg-yellow-100/80 text-yellow-900 border-yellow-200/60',
+  'sad': 'bg-indigo-100/80 text-indigo-900 border-indigo-200/60',
   
   // Places -> Green
-  'home': 'bg-emerald-300 text-slate-900 border-emerald-400',
-  'school': 'bg-emerald-300 text-slate-900 border-emerald-400',
-  'park': 'bg-emerald-300 text-slate-900 border-emerald-400',
-  'store': 'bg-emerald-300 text-slate-900 border-emerald-400',
+  'home': 'bg-emerald-100/80 text-emerald-900 border-emerald-200/60',
+  'school': 'bg-emerald-100/80 text-emerald-900 border-emerald-200/60',
+  'park': 'bg-emerald-100/80 text-emerald-900 border-emerald-200/60',
+  'store': 'bg-emerald-100/80 text-emerald-900 border-emerald-200/60',
 };
 
-// Helper: map a label to a color class string, defaulting to dark slate 
+// Helper: map a label to a color class string, defaulting to Clay-Light
 function getTileColorClass(label: string, isFolder?: boolean): string {
-  // If it's a folder, use light gray background (folder differentiation)
-  if (isFolder) return 'bg-slate-200 border-slate-300 text-slate-900 border-b-4 border-b-slate-400';
+  // If it's a folder, white background with subtle border
+  if (isFolder) return 'bg-white border-clay-200/60 text-clay-900 border shadow-sm';
 
   // Direct match
   if (WORD_COLORS[label]) return WORD_COLORS[label];
-  // Lowercase match
   const lower = label.toLowerCase();
   
   if (WORD_COLORS[lower]) return WORD_COLORS[lower];
 
   // Default for normal items
-  return 'bg-slate-800 border-slate-700/50 text-slate-200'
+  return 'bg-white/40 border-white/60 text-clay-900'
 }
 
 const MemoTile = React.memo(({ label, icon: Icon, color, onTileClick, isFolder, isDimmed, isRecommended }: { 
@@ -231,42 +231,40 @@ const MemoTile = React.memo(({ label, icon: Icon, color, onTileClick, isFolder, 
   color?: string, 
   onTileClick: (label: string, isFolder?: boolean) => void, 
   isFolder?: boolean,
-  isDimmed?: boolean, // This means "visually deemphasized"
+  isDimmed?: boolean, 
   isRecommended?: boolean
 }) => {
-  // Determine background/border/text style
   const colorClass = getTileColorClass(label, isFolder);
+  const hasColorBg = !colorClass.includes('bg-white/40');
   
-  // Check if we are using a specific colored background (not the default slate-800)
-  const hasColorBg = !colorClass.includes('bg-slate-800');
-  
-  // For folders (white bg), we want colored icons. For other colored tiles, we generally want dark icons.
-  // Use the passed `color` prop if available (for folders), otherwise dark if bg is light, otherwise light.
   const iconClass = isFolder 
-     ? (color ? color.replace('text-', 'text-') : 'text-slate-900') // Keep original color for folders 
-     : (hasColorBg ? 'text-slate-900 opacity-80' : (color || 'text-slate-300'));
+     ? (color ? color.replace('text-', 'text-') : 'text-clay-900') 
+     : (hasColorBg ? 'text-black/70' : (color || 'text-clay-500'));
 
   return (
     <button 
       onClick={() => onTileClick(label, isFolder)}
       className={`
         group flex flex-col items-center justify-center text-center
-        aspect-square w-full
-        rounded-2xl p-2
+        aspect-[9/10] w-full
+        rounded-xl p-1.5 sm:p-2
         cursor-pointer
-        border transition-all duration-500
-        ${isDimmed ? 'opacity-60 scale-95 border-transparent shadow-none hover:opacity-100 hover:scale-100 hover:z-20' : ''}
-        ${isRecommended ? 'z-10 scale-110 shadow-[0_0_20px_rgba(56,189,248,0.5)] ring-4 ring-sky-400 brightness-110' : ''}
-        ${!isDimmed && !isRecommended ? 'hover:scale-105 hover:brightness-110 shadow-sm' : ''}
+        border transition-all duration-300
+        backdrop-blur-md overflow-hidden relative
+        ${isDimmed ? 'opacity-40 scale-95 border-transparent shadow-none grayscale' : ''}
+        ${isRecommended ? 'z-10 scale-105 shadow-[0_0_20px_rgba(235,52,52,0.3)] ring-2 ring-crimson/50 brightness-105' : ''}
+        ${!isDimmed && !isRecommended ? 'hover:scale-[1.03] hover:brightness-105 hover:shadow-md hover:border-black/10' : ''}
         ${colorClass}
       `}
     >
       {Icon && (
-        <Icon className={`w-8 h-8 mb-1 ${iconClass}`} />
+        <Icon className={`w-7 h-7 sm:w-9 sm:h-9 mb-1 sm:mb-1.5 shrink-0 ${iconClass}`} />
       )}
-      <span className="text-xs sm:text-sm font-bold leading-tight break-words line-clamp-2">
-        {label}
-      </span>
+      <div className="w-full flex items-center justify-center grow min-h-0 px-1">
+         <span className="text-[10px] sm:text-xs font-bold leading-tight break-words hyphens-auto line-clamp-2 w-full uppercase tracking-tight opacity-90 block">
+           {label}
+         </span>
+      </div>
     </button>
   );
 });
@@ -281,29 +279,22 @@ export default function PictureGrid({ onSelect }: PictureGridProps) {
   const [newWord, setNewWord] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   
-  // Ref for typedText to prevent re-creating handleTileClick on every keystroke
   const typedTextRef = React.useRef(typedText);
   useEffect(() => { typedTextRef.current = typedText; }, [typedText]);
 
-  // TRIGGER PREDICTIONS ON TYPING (The Missing Link for Signal Brain)
-  // When text changes, we want to refresh predictions so the grid highlights update based on the new context
   useEffect(() => {
-    // Only fetch if meaningful change and we are not in infinite loop
-    const state = useStore.getState(); // Get fresh state
+    const state = useStore.getState(); 
     if (state.inputMode !== 'spark' && typedText.trim().length > 0) {
-        state.refreshPredictions(typedText); // This debounces internally in store if called rapidly
+        state.refreshPredictions(typedText); 
     }
   }, [typedText]);
 
-  // Load custom icons from DB on mount
   useEffect(() => {
     const fetchIcons = async () => {
         try {
             const res = await fetch('/api/custom-icons');
             const data = await res.json();
             if (data.icons) {
-                // Completely replace the store with the source of truth from DB
-                // This prevents duplicates on reloads/hmr/strict mode
                 const mappedIcons = data.icons.map((icon: any) => ({
                     id: icon._id,
                     label: icon.label,
@@ -317,7 +308,7 @@ export default function PictureGrid({ onSelect }: PictureGridProps) {
         }
     };
     fetchIcons();
-  }, []); // Run once on mount
+  }, []); 
 
   const handleCreateWord = async () => {
     if (!newWord.trim()) return;
@@ -373,7 +364,6 @@ export default function PictureGrid({ onSelect }: PictureGridProps) {
     }
   };
 
-  // Desired fixed rows and ordering
   const FIRST_ROW = ['I','is','can','will','do','have','what','where','who','not','more'];
   const SECOND_ROW = ['you','we','want','like','need','get','to','with','in','now','all done'];
   const THIRD_ROW = ['he','she','stop','go','come','take','for','here','out','good','different'];
@@ -394,9 +384,7 @@ export default function PictureGrid({ onSelect }: PictureGridProps) {
     !loweredFifth.has(q.label.toLowerCase())
   );
 
-  // Optimization: Calculate recommendations once per store update
   const recommendedSet = React.useMemo(() => {
-    // FIX: Optimized calculation - only runs when typedText or suggestions change
     if (!suggestions.length || typedText.trim().length === 0) return new Set<string>();
     
     const recs = new Set<string>();
@@ -404,7 +392,6 @@ export default function PictureGrid({ onSelect }: PictureGridProps) {
 
     const checkAndAdd = (label: string) => {
         const lbl = label.toLowerCase();
-        // Check exact match or if it's part of the suggestion phrase
         const isMatch = loweredSuggestions.some(sug => {
             if (sug === lbl || sug.startsWith(lbl)) return true;
             return sug.includes(` ${lbl} `) || sug.endsWith(` ${lbl}`) || sug.startsWith(`${lbl} `);
@@ -432,30 +419,12 @@ export default function PictureGrid({ onSelect }: PictureGridProps) {
         const cat = CATEGORIES.find(c => c.label === label);
         if (cat) setPictureCategory(cat.id);
     } else {
-        // --- LEARNING REMOVED (Moved to 'Speak' action) ---
-        // We only learn when the user commits to the full sentence.
-        /*
-        const currentBuffer = typedTextRef.current.trim();
-        if (currentBuffer.length > 0) {
-            const words = currentBuffer.split(/\s+/);
-            const contextWord = words[words.length - 1]; 
-            if (learnTransition) {
-                 learnTransition(contextWord, label);
-            }
-        }
-        */
-        
         onSelect(label);
     }
   }, [onSelect, setPictureCategory, setIsModalOpen, learnTransition]);
 
   const renderTile = React.useCallback((label: string, icon: any, color?: string, isFolder: boolean = false) => {
-    // Basic booleans
-    // FIX: Only show recommendations if Highlight is enabled
     const isRecommended = isHighlightEnabled && recommendedSet.has(label);
-    
-    // Since we moved this hook up, we must ensure these variables are accessible or re-access from store
-    // actually 'suggestions' and 'typedText' are in scope from useStore
     const hasSuggestions = suggestions.length > 0 && typedText.trim().length > 0;
     const isDimmed = isHighlightEnabled && hasSuggestions && !isRecommended;
 
@@ -467,7 +436,7 @@ export default function PictureGrid({ onSelect }: PictureGridProps) {
         color={color}
         onTileClick={handleTileClick}
         isFolder={isFolder}
-        isDimmed={isDimmed} // Just semantic
+        isDimmed={isDimmed} 
         isRecommended={isRecommended}
       />
     );
@@ -478,12 +447,16 @@ export default function PictureGrid({ onSelect }: PictureGridProps) {
   }
 
   return (
-    <div className="w-full h-full overflow-y-auto p-4 custom-scrollbar flex flex-col gap-2 relative">
-      
-      {/* Top fixed rows */}
-      <div className="grid grid-cols-11 gap-2">
-        {FIRST_ROW.map((label) => renderTile(label, WORD_ICONS[label]))}
-      </div>
+    <div className="w-full h-full relative group/grid">
+      {/* Top Fade */}
+      <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-[#E6E2D6] to-transparent z-10 pointer-events-none" />
+
+      <div className="w-full h-full overflow-y-auto px-4 pt-8 pb-8 custom-scrollbar flex flex-col gap-2 relative">
+        
+        {/* Top fixed rows */}
+        <div className="grid grid-cols-11 gap-2">
+          {FIRST_ROW.map((label) => renderTile(label, WORD_ICONS[label]))}
+        </div>
 
       <div className="grid grid-cols-11 gap-2">
         {SECOND_ROW.map((label) => renderTile(label, WORD_ICONS[label]))}
@@ -514,27 +487,30 @@ export default function PictureGrid({ onSelect }: PictureGridProps) {
         <div className="w-full aspect-square" />
         <button 
            onClick={() => setIsModalOpen(true)}
-           className="group flex flex-col items-center justify-center text-center aspect-square w-full rounded-2xl p-2 cursor-pointer border border-dashed border-slate-600 bg-slate-800/40 text-slate-400 hover:text-white hover:border-sky-500 hover:bg-slate-800 transition-all"
+           className="group flex flex-col items-center justify-center text-center aspect-[9/10] w-full rounded-xl p-2 cursor-pointer border-2 border-dashed border-clay-400/60 bg-white/50 text-clay-600 hover:text-crimson hover:border-crimson hover:bg-white transition-all backdrop-blur-sm"
         >
-           <Plus className="w-8 h-8 mb-1 opacity-60 group-hover:opacity-100" />
-           <span className="text-xs font-bold leading-tight">Add Word</span>
+           <Plus className="w-8 h-8 mb-1 opacity-80 group-hover:opacity-100" />
+           <span className="text-xs font-bold leading-tight uppercase">Add Word</span>
         </button>
       </div>
+      </div>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl w-full max-w-sm shadow-2xl">
-            <h3 className="text-xl font-bold text-white mb-1">Infinite Icon</h3>
-            <p className="text-slate-400 text-sm mb-4">Generate a new word with AI.</p>
+      {/* Bottom Fade */}
+      <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-[#E6E2D6] to-transparent z-10 pointer-events-none" />
+
+      {isModalOpen && createPortal(
+        <div className="fixed inset-0 bg-clay-900/40 z-[100] flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white/90 border border-white/60 p-6 rounded-[2rem] w-full max-w-sm shadow-[0_0_50px_rgba(0,0,0,0.1)] backdrop-blur-xl scale-100 animate-in zoom-in-95 duration-200">
+            <h3 className="text-xl font-bold text-clay-900 mb-1">Infinite Icon</h3>
+            <p className="text-clay-500 text-sm mb-4">Generate a new word with AI.</p>
             
             <input 
               autoFocus
-              className="w-full bg-slate-800 text-white placeholder-slate-500 rounded-xl px-4 py-3 mb-4 focus:ring-2 focus:ring-sky-500 outline-none border border-slate-700"
+              className="w-full bg-clay-100/50 text-clay-900 placeholder-clay-400 rounded-2xl px-4 py-3 mb-4 focus:ring-2 focus:ring-crimson/50 outline-none border border-clay-200 transition-all"
               placeholder="Type a word (e.g. Banana)"
               value={newWord}
               onChange={(e) => {
                 const val = e.target.value;
-                // Title Case each word (e.g. "red apple" -> "Red Apple")
                 const formatted = val.split(' ').map(word => 
                     word.length > 0 ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() : ''
                 ).join(' ');
@@ -547,14 +523,14 @@ export default function PictureGrid({ onSelect }: PictureGridProps) {
               <button 
                 onClick={() => setIsModalOpen(false)}
                 disabled={isGenerating}
-                className="flex-1 px-4 py-3 rounded-xl bg-slate-800 text-slate-300 font-semibold hover:bg-slate-700 disabled:opacity-50 transition-colors"
+                className="flex-1 px-4 py-3 rounded-2xl bg-clay-100 text-clay-500 font-bold hover:bg-clay-200 disabled:opacity-50 transition-colors"
               >
                 Cancel
               </button>
               <button 
                 onClick={handleCreateWord}
                 disabled={isGenerating || !newWord.trim()}
-                className="flex-1 px-4 py-3 rounded-xl bg-sky-500 text-white font-bold hover:bg-sky-400 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors shadow-lg shadow-sky-500/20"
+                className="flex-1 px-4 py-3 rounded-2xl bg-crimson text-white font-bold hover:bg-crimson/90 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors shadow-lg shadow-crimson/20"
               >
                 {isGenerating ? (
                   <>
@@ -567,10 +543,11 @@ export default function PictureGrid({ onSelect }: PictureGridProps) {
               </button>
             </div>
             {isGenerating && (
-                <p className="text-center text-xs text-slate-500 mt-3 animate-pulse">This may take a few seconds...</p>
+                <p className="text-center text-xs text-clay-500 mt-3 animate-pulse font-medium">Dreaming up a symbol...</p>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

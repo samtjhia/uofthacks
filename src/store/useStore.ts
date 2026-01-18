@@ -445,10 +445,23 @@ export const useStore = create<AppState>((set, get) => ({
 
   addScheduleItem: async (label, timeBlock, startTime, durationMinutes) => {
     try {
+      // Auto-correct timeBlock if startTime is provided
+      let finalBlock = timeBlock;
+      if (startTime) {
+         const [h, m] = startTime.split(':').map(Number);
+         const total = h * 60 + m;
+         // Morning: 5:00 (300) - 12:00 (720)
+         // Afternoon: 12:00 (720) - 17:00 (1020)
+         // Evening: Rest
+         if (total >= 300 && total < 720) finalBlock = 'morning';
+         else if (total >= 720 && total < 1020) finalBlock = 'afternoon';
+         else finalBlock = 'evening';
+      }
+
       const res = await fetch('/api/schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label, timeBlock, startTime, durationMinutes }),
+        body: JSON.stringify({ label, timeBlock: finalBlock, startTime, durationMinutes }),
       });
       if (res.ok) {
         // Refresh schedule
@@ -462,15 +475,25 @@ export const useStore = create<AppState>((set, get) => ({
 
   updateScheduleItem: async (id, updates) => {
     try {
+       // Auto-correct timeBlock if startTime is updated
+       const finalUpdates = { ...updates };
+       if (updates.startTime) {
+         const [h, m] = updates.startTime.split(':').map(Number);
+         const total = h * 60 + m;
+         if (total >= 300 && total < 720) finalUpdates.timeBlock = 'morning';
+         else if (total >= 720 && total < 1020) finalUpdates.timeBlock = 'afternoon';
+         else finalUpdates.timeBlock = 'evening';
+       }
+
        // Optimistic
        const current = get();
-       const newItems = current.scheduleItems.map(i => i._id === id ? { ...i, ...updates } : i);
+       const newItems = current.scheduleItems.map(i => i._id === id ? { ...i, ...finalUpdates } : i);
        set({ scheduleItems: newItems });
 
        await fetch('/api/schedule', {
          method: 'PUT',
          headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify({ id, ...updates }),
+         body: JSON.stringify({ id, ...finalUpdates }),
        });
        // In background re-fetch to ensure consistency? Maybe later.
     } catch (error) {

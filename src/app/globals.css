@@ -14,30 +14,29 @@
   }
 }
 
-/* CYBERDECK THEME OVERRIDES */
+/* THEME OVERRIDES: Clean/Clay/Nothing */
 body {
-  background-color: #050505;
-  color: #e0e0e0;
+  background-color: #E6E2D6; /* Clay-200 base */
+  color: #1C1C1E; /* Obsidian */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  overflow: hidden; /* Fix layout shift */
 }
 
-/* Utilities for Glassmorphism */
+/* Utilities for Glassmorphism 2.0 (Apple/Nothing Hybrid) */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.03);
 }
 
-.text-neon-green {
-  color: #39ff14;
-  text-shadow: 0 0 10px rgba(57, 255, 20, 0.5);
+.text-crimson-glow {
+  color: #EB3434;
+  text-shadow: 0 0 20px rgba(235, 52, 52, 0.3);
 }
 
-.border-neon-green {
-  border-color: #39ff14;
-  box-shadow: 0 0 5px rgba(57, 255, 20, 0.3);
-}
-
-/* Custom Scrollbar Utilities */
+/* Custom Scrollbar Utilities (Clean) */
 .scrollbar-hide::-webkit-scrollbar {
     display: none;
 }
@@ -47,15 +46,15 @@ body {
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(0,0,0,0.2);
+  background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.1);
+  background: rgba(28, 28, 30, 0.1); /* Obsidian low opacity */
   border-radius: 100vh;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255,255,255,0.2);
+  background: rgba(235, 52, 52, 0.4); /* Crimson low opacity */
 }

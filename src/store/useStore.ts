@@ -56,6 +56,8 @@ export interface AppState {
   toggleAutoMode: () => void;
   isSpeaking: boolean;
   setIsSpeaking: (isSpeaking: boolean) => void;
+  speechTone: 'neutral' | 'happy' | 'serious' | 'empathic';
+  setSpeechTone: (tone: 'neutral' | 'happy' | 'serious' | 'empathic') => void;
 
   inputMode: 'text' | 'picture' | 'spark' | 'schedule';
   setInputMode: (mode: 'text' | 'picture' | 'spark' | 'schedule') => void;
@@ -86,6 +88,7 @@ export interface AppState {
   engineLogs: { id: string, timestamp: string, message: string, type: 'info' | 'success' | 'warning' | 'error' }[];
   addEngineLog: (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
   cacheStats: { size: number, max: number };
+  memories: { id: string; text: string; timestamp: string }[]; // <--- New State
 
   // Actions
   addHistoryItem: (item: ChatMessage) => Promise<void>;
@@ -94,6 +97,9 @@ export interface AppState {
 
   // Async Actions
   fetchHistory: () => Promise<void>;
+  clearHistory: () => Promise<void>; 
+  fetchMemories: () => Promise<void>; // <--- New Action
+  clearMemories: () => Promise<void>;
   fetchSuggestions: (onlySignals?: boolean) => Promise<void>;
   fetchSchedule: () => Promise<void>;
   addScheduleItem: (label: string, timeBlock: 'morning' | 'afternoon' | 'evening', startTime?: string, durationMinutes?: number) => Promise<void>;
@@ -125,6 +131,8 @@ export const useStore = create<AppState>((set, get) => ({
   toggleAutoMode: () => set((state) => ({ isAutoMode: !state.isAutoMode })),
   isSpeaking: false,
   setIsSpeaking: (isSpeaking) => set({ isSpeaking }),
+  speechTone: 'neutral',
+  setSpeechTone: (tone) => set({ speechTone: tone }),
 
   inputMode: 'text',
   setInputMode: (mode) => {
@@ -135,6 +143,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
   
   typedText: '',
+  memories: [], // Init empty
   pictureCategory: null,
   setPictureCategory: (cat) => set({ pictureCategory: cat }),
   setTypedText: (text) => {
@@ -185,6 +194,15 @@ export const useStore = create<AppState>((set, get) => ({
             // If in Spark mode, we intentionally IGNORE history to provide fresh starters
             const recentHistory = isSpark ? '' : state.history.slice(-3).map(m => `${m.role}: ${m.content}`).join('\n');
             
+            // EXTRACT LAST PARTNER MESSAGE (Signal 1 - Explicit)
+            // Look for the last message that is NOT from the user.
+            const lastPartnerMsgObj = [...state.history].reverse().find(m => m.role !== 'user');
+            // CLEANUP: Remove "Partner: " prefix if present, to give clean text to the Brain
+            const rawPartnerContent = lastPartnerMsgObj ? lastPartnerMsgObj.content : null;
+            const lastPartnerMessage = rawPartnerContent 
+               ? rawPartnerContent.replace(/^Partner:\s*"/, '').replace(/"$/, '').replace(/^Partner:\s*/, '')
+               : null;
+
             // FIX: Do NOT trim text. "so" (completions) and "so " (next word) are different states.
             // Cache Key now includes Schedule to differentiate contexts (e.g. Beach vs Home)
             const cacheKey = `${isSpark ? 'SPARK' : 'PREDICT'}|${text}|${recentHistory}|${relevantSchedule}`; 
@@ -210,6 +228,7 @@ export const useStore = create<AppState>((set, get) => ({
                     text, 
                     history: recentHistory,
                     mode: isSpark ? 'spark' : 'predict',
+                    lastPartnerMessage, // Explicitly pass the detected partner message
                     // New Context Signals
                     time: timeString,
                     userProfile: state.userProfile,
@@ -277,12 +296,37 @@ export const useStore = create<AppState>((set, get) => ({
   addHistoryItem: async (item) => {
     // Optimistic update
     set((state) => ({ history: [...state.history, item] }));
+    
+    // TRIGGER: If the new item is from 'assistant' (Partner), immediately predict responses
+    if (item.role === 'user') { // wait. The 'Listening' usually adds as 'user' or 'partner'? 
+       // In this app, 'user' is Samantha (the AAC user). 'assistant' is usually the AI response... 
+       // BUT, the 'Listener' (Microphone) detects the *other* person.
+       // Let's check how 'Listener' adds items. Usually listening adds as 'system' or 'partner' or 'assistant'.
+       // Assuming standard chat: user = me, assistant = them.
+       // Actually, chat history usually puts user = Me, assistant = AI. 
+       // For a conversation aid, "Listener" input should probably be logged as 'assistant' (The Interlocutor).
+    }
+
     try {
       await fetch('/api/history', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: item.role, content: item.content }),
       });
+      
+      // AUTO-PREDICT TRIGGER
+      // If the message was added by the "Partner" (assistant role in this context, or however we map it),
+      // we should trigger a prediction for the User ("user" role).
+      // Let's verify who is who. If the app listens to "What is your name?", that is the PARTNER speaking.
+      // So if (item.role !== 'user') -> Trigger refreshPredictions()
+      if (item.role !== 'user') {
+          // Verify we aren't already typing
+          const currentText = get().typedText;
+          if (!currentText) {
+             get().refreshPredictions(''); // Zero-shot prediction based on this new history
+          }
+      }
+
     } catch (error) {
       console.error('Failed to save history item:', error);
     }
@@ -343,7 +387,42 @@ export const useStore = create<AppState>((set, get) => ({
       console.error('Failed to fetch suggestions:', error);
     }
   },
-fetchSchedule: async () => {
+
+  clearHistory: async () => {
+    try {
+        set({ history: [] }); // Optimistic clear
+        await fetch('/api/history', { method: 'DELETE' });
+        get().addEngineLog('History cleared', 'success');
+    } catch (err) {
+        console.error("Failed to clear history", err);
+    }
+  },
+
+  fetchMemories: async () => {
+    try {
+        const res = await fetch('/api/memories');
+        const data = await res.json();
+        if (data.memories) {
+            set({ memories: data.memories });
+        }
+    } catch (err) {
+        console.error('Failed to fetch memories', err);
+    }
+  },
+
+  clearMemories: async () => {
+    try {
+        if (!window.confirm("Are you sure you want to Wipe All Long-Term Memories? This cannot be undone.")) return;
+        
+        set({ memories: [] }); // Optimistic
+        await fetch('/api/memories', { method: 'DELETE' });
+        get().addEngineLog('Memory wiped', 'success');
+    } catch (err) {
+        console.error("Failed to clear memories", err);
+    }
+  },
+
+  fetchSchedule: async () => {
     try {
       const res = await fetch('/api/schedule');
       if (res.ok) {

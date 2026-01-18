@@ -1,32 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import OpenAI from 'openai';
 import { SuggestionResponse } from '@/types';
 import connectToDatabase from '@/lib/db';
 import { Transition } from '@/lib/models';
-
-// --- CONFIGURATION ---
-// Change this to 'gemini' or 'openai' to switch providers
-const ACTIVE_PROVIDER: 'gemini' | 'openai' = (process.env.AI_PROVIDER as 'gemini' | 'openai') || 'openai';
-
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-
-// Initialize OpenAI
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY || '',
-});
+import { generateCompletion } from '@/lib/ai';
+import { searchMemory } from '@/lib/memory';
 
 export async function POST(req: NextRequest) {
   try {
-    const { text, history, time, schedule, userProfile, habits, mode } = await req.json();
+    const { text, history, time, schedule, userProfile, habits, mode, lastPartnerMessage } = await req.json();
 
-    // Check Keys based on provider
-    if (ACTIVE_PROVIDER === 'gemini' && !process.env.GEMINI_API_KEY) {
-       return NextResponse.json({ error: 'GEMINI_API_KEY not configured' }, { status: 500 });
-    }
-    if (ACTIVE_PROVIDER === 'openai' && !process.env.OPENAI_API_KEY) {
-       return NextResponse.json({ error: 'OPENAI_API_KEY not configured' }, { status: 500 });
+    // 1. MEMORY ENGINE (Signal 3)
+    // If the partner just spoke, search memory for context about what they said.
+    let memoryContext = "";
+    if (lastPartnerMessage) {
+        console.log(`🔍 [Signal 3] Searching Memory for: "${lastPartnerMessage}"`);
+        // Search for key terms in the partner's message
+        // Optimization: We could use an LLM to extract keywords first, but raw search works for hackathons
+        const memories = await searchMemory(lastPartnerMessage);
+        if (memories.length > 0) {
+            // Join with specific separators to prevent hallucinated merging
+            memoryContext = memories.map((m, i) => `Fact ${i+1}: "${m.text}"`).join('\n');
+            console.log("🧠 Memory Hit:", memoryContext);
+        } else {
+            console.log("🤷‍♂️ Memory Miss: No relevant memories found.");
+        }
     }
 
     // --- SIGNAL 5: LEARNED TRANSITIONS (DB CHECK) ---
@@ -122,21 +119,29 @@ export async function POST(req: NextRequest) {
     } else {
         prompt = `
           # Role: ThoughtFlow Predictive Component (Context-Aware AAC)
-          Your job is to predict the user's *intended next word* by fusing 5 real-time context signals.
+          You are an advanced predictive engine for users with speech impairments. Your job is to predict the user's *intended next word* by fusing 5 real-time context signals.
           
           # The 5 Signals (Hierarchy of Importance):
           1. **Signal 6 [The Filter]**: HARD CONSTRAINT. Predictions MUST start with the user's current input: "${text}". 
              - **EXCEPTION**: If input is EMPTY, predict 4 distinct conversation starters based on Schedule/History/Time.
-          2. **Signal 1 [The Listener]**: CRITICAL PRIORITY. Conversation Continuity. If the last message was a question, suggesting a direct answer is the top priority.
-          3. **Signal 4 [The Habits]**: High Priority. Users repeat themselves. If a frequent habit matches the input/context, it wins.
-          4. **Signal 2 [The Scheduler]**: Context Booster. If the schedule says "Art Class", boost words like "paint", "color", "canvas".
-          5. **Signal 5 [The Grammar]**: Syntactic Validity. Ensure the sentence makes grammatical sense.
+          2. **Signal 1 [The Listener]**: **CRITICAL - MAXIMUM PRIORITY**. If the last history message is from 'partner' or is a QUESTION, your main job is to answer it. Ignoring a direct question is a failure.
+          3. **Signal 3 [The Memory]**: Long-Term Info. Use this to answer specific factual questions (e.g., "When is the wedding?"). 
+             - **WARNING**: Treat each retrieved Fact as ATOMIC. Do NOT merge unrelated facts (e.g. do not combine "I work at X" with "My favorite color is Y" unless the user asks for both).
+          4. **Signal 4 [The Habits]**: High Priority. Users repeat themselves. If a frequent habit matches the input/context, it wins.
+          5. **Signal 2 [The Scheduler]**: Context Booster. If the schedule says "Art Class", boost words like "paint", "color", "canvas".
+          6. **Signal 5 [The Grammar]**: Syntactic Validity. Ensure the sentence makes grammatical sense.
 
           # Current State Signals
           ${systemContext}
-          [Signal 1 - Recent History]:
+          [Signal 1 - Recent History (MOST IMPORTANT FOR CONTEXT)]:
           ${history || "None"}
+
+          [Signal 3 - Retrieved Memories (Long-Term Facts)]:
+          ${memoryContext || "No relevant memories found."}
           
+          [Signal 1.5 - LATEST PARTNER MESSAGE (The Trigger)]:
+          "${lastPartnerMessage || "None"}"
+
           [Signal 4 - Habit Bank]:
           ${habits && habits.length > 0 ? habits.slice(0, 50).join(', ') : "None provided"}
 
@@ -144,16 +149,21 @@ export async function POST(req: NextRequest) {
           "${text}"
 
           # Prediction Algorithm (Execute Step-by-Step):
-          1. **Check History (Signal 1)**: IMMEDIATELY analyze the last incoming message. Does it demand a response (Who/What/Where/When)? If yes, prioritize answers in the predictions.
-          2. **Analyze Schedule**: Extract keywords related to the current "${schedule}" context.
-          3. **Filter Habits**: Check if any provided habits match the current input "${text}".
-          4. **Synthesize**: Generate 4 predictions that satisfy the Filter Constraint ("${text}...") and maximize Context Relevance.
-             - *Conflict Rule*: If History demands an answer (e.g., "Do you want water?"), predict "Yes"/"No" or relevant answers BEFORE schedule/habit suggestions.
+          1. **Status Check**: Is the input "${text}" empty?
+          2. **IF INPUT IS EMPTY**: 
+             - **FOCUS ON [Signal 1.5 - LATEST PARTNER MESSAGE]**: This is the message you are responding to. Ignore older history if this is present.
+             - **CASE A: Partner Message is a QUESTION**: Your 4 predictions MUST be direct answers to it.
+                - **CRITICAL**: Check [Signal 3 - Retrieved Memories]. If a memory provides the answer (e.g. Question: "What is my fav color?", Memory: "Sam's fav color is green"), you MUST provide that answer as the Top Prediction.
+             - **CASE B: Partner Message is a STATEMENT/GREETING** (e.g. "Hello there"): Your predictions MUST be relevant follow-ups/replies.
+             - **CASE C: No Partner Message**: Suggest conversational starters based on Schedule/Location.
+          3. **IF INPUT IS NOT EMPTY**:
+             - Filter suggested habits/words to strictly start with "${text}".
+             - Prioritize words that *complete the answer* to the previous question if applicable.
           
           # Output Format
           Return a SINGLE JSON object. No markdown.
           {
-            "thought_process": "1-sentence explanation of how you used Schedule/History to choose these specific words.",
+            "thought_process": "Explain why you chose these words. If History was used, explicitly mention 'Answering Question: [Question]'.",
             "predictions": [
               { "word": "Label1", "sentence": "Complete, conversational sentence." },
               { "word": "Label2", "sentence": "Complete, conversational sentence." },
@@ -168,7 +178,6 @@ export async function POST(req: NextRequest) {
 
           # Guidelines for 'sentence' field:
           - **Conversational**: Must be a natural thing to say.
-
           - **Expansion**: If 'word' is "Water", 'sentence' must be "I need some water please" or "Can I get a drink?". NEVER just "Water".
           - **Grammar**: Fix articles and pronouns. (e.g., "to face" -> "to my face").
           - **Variety**: If reasonable, offer slightly different intents for the same word, or varied phrasing.
@@ -177,29 +186,20 @@ export async function POST(req: NextRequest) {
     }
 
     let rawText = "";
+    let usedModel = "";
 
-    console.log(`🧠 Predicting with Provider: ${ACTIVE_PROVIDER.toUpperCase()}`);
-
-    if (ACTIVE_PROVIDER === 'openai') {
-        const completion = await openai.chat.completions.create({
-            messages: [
-                { role: "system", content: "You are a predictive text engine. Output JSON only." },
-                { role: "user", content: prompt }
-            ],
-            model: "gpt-4o-mini", // Recommended for speed/cost (comparable to Flash)
-            response_format: { type: "json_object" },
-            temperature: 0.7,
-        });
-        rawText = completion.choices[0].message.content || "{}";
-        console.log("OpenAI Raw:", rawText);
-    } 
-    else {
-        // Use Gemini 2.0 Flash Experimental
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        rawText = response.text();
-        console.log("Gemini Raw:", rawText);
+    try {
+        const result = await generateCompletion(
+            "You are a predictive text engine. Output JSON only.",
+            prompt,
+            true
+        );
+        rawText = result.text;
+        usedModel = result.model;
+        console.log(`🧠 AI Response [${usedModel}]:`, rawText.substring(0, 100) + "...");
+    } catch (e) {
+        console.error("AI Generation Failed:", e);
+        throw e;
     }
 
     // Clean up markdown if AI adds it (Gemini often does, OpenAI in JSON mode usually doesn't but safe to keep)
@@ -223,7 +223,7 @@ export async function POST(req: NextRequest) {
             }
         }
     } catch (e) {
-      console.error("Failed to parse Gemini response:", rawText);
+      console.error("Failed to parse Gemini/OpenAI response:", rawText);
       predictions = [
         { word: "Yes", sentence: "Yes" }, 
         { word: "No", sentence: "No" }, 
@@ -241,7 +241,7 @@ export async function POST(req: NextRequest) {
         }
 
         return {
-            id: `${ACTIVE_PROVIDER}-${Date.now()}-${idx}`,
+            id: `pred-${Date.now()}-${idx}`,
             label: niceLabel, 
             text: pred.sentence, // Store the full sentence here
             type: 'prediction',
@@ -249,9 +249,6 @@ export async function POST(req: NextRequest) {
         };
     });
     
-    // MODEL METADATA
-    const usedModel = ACTIVE_PROVIDER === 'openai' ? 'gpt-4o-mini' : 'gemini-2.0-flash-exp';
-
     return NextResponse.json({ suggestions, reasoning, model: usedModel });
 
   } catch (error) {

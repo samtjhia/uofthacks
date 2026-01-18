@@ -4,7 +4,11 @@ import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { Mic, MicOff, Smile, Frown, Meh, Heart, MessageCircle } from 'lucide-react';
 
 export default function RightSidebar() {
-  const { isListening, toggleListening, suggestions, isPredicting, setTypedText, addHistoryItem, isAutoMode, toggleAutoMode, fetchSuggestions, fetchSchedule, reinforceHabit, refreshPredictions } = useStore();
+  const { 
+    isListening, toggleListening, suggestions, isPredicting, setTypedText, 
+    addHistoryItem, isAutoMode, toggleAutoMode, fetchSuggestions, fetchSchedule, 
+    reinforceHabit, refreshPredictions, speechTone, setSpeechTone
+  } = useStore();
   
   React.useEffect(() => {
     // 1. Initialize Signals (Silently)
@@ -218,22 +222,33 @@ export default function RightSidebar() {
           <label className="block text-xs text-slate-400 font-medium mb-3 text-center">Response Tone</label>
           <div className="flex justify-between items-center px-2">
             {[
-              { icon: Meh, label: "Neutral", color: 'text-slate-300' },
-              { icon: Smile, label: "Happy", color: 'text-sky-400' },
-              { icon: Frown, label: "Serious", color: 'text-indigo-400' },
-              { icon: Heart, label: "Empath", color: 'text-teal-400' }
-            ].map((tone, idx) => (
+              { icon: Meh, label: "neutral", display: "Neutral", color: 'text-slate-300' },
+              { icon: Smile, label: "happy", display: "Happy", color: 'text-sky-400' },
+              { icon: Frown, label: "serious", display: "Serious", color: 'text-indigo-400' },
+              { icon: Heart, label: "empathic", display: "Empath", color: 'text-teal-400' }
+            ].map((tone, idx) => {
+              // @ts-ignore
+              const isActive = speechTone === tone.label;
+              return (
               <button 
                 key={idx} 
-                onClick={(e) => e.currentTarget.blur()}
+                // @ts-ignore
+                onClick={(e) => { 
+                    setSpeechTone(tone.label as any);
+                    e.currentTarget.blur();
+                }}
                 className="group flex flex-col items-center gap-1.5"
-                title={tone.label}
+                title={tone.display}
               >
-                <div className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all group-hover:scale-110 group-active:scale-95 border border-white/5">
-                    <tone.icon className={`w-5 h-5 ${tone.color} opacity-80 group-hover:opacity-100`} />
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all group-hover:scale-110 group-active:scale-95 border ${
+                    isActive 
+                    ? 'bg-white/10 border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.1)]' 
+                    : 'bg-white/5 hover:bg-white/10 border-white/5'
+                }`}>
+                    <tone.icon className={`w-5 h-5 ${tone.color} ${isActive ? 'opacity-100' : 'opacity-50 group-hover:opacity-100'}`} />
                 </div>
               </button>
-            ))}
+            )})}
           </div>
         </div>
 

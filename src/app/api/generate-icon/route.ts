@@ -20,6 +20,7 @@ export async function POST(req: Request) {
         prompt: `A simple, flat vector icon of ${word}, minimal design, solid color, black background, suitable for an AAC communication board.`,
         n: 1,
         size: "1024x1024",
+        response_format: "b64_json" 
       }),
     });
 
@@ -30,11 +31,14 @@ export async function POST(req: Request) {
        return NextResponse.json({ error: data.error?.message || 'Failed to generate image' }, { status: response.status });
     }
 
-    const imageUrl = data.data?.[0]?.url;
+    const b64 = data.data?.[0]?.b64_json;
 
-    if (!imageUrl) {
-        return NextResponse.json({ error: 'No image URL returned' }, { status: 500 });
+    if (!b64) {
+        return NextResponse.json({ error: 'No image data returned' }, { status: 500 });
     }
+    
+    // Convert to data URL
+    const imageUrl = `data:image/png;base64,${b64}`;
 
     return NextResponse.json({ imageUrl });
   } catch (error) {

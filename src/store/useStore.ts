@@ -89,6 +89,10 @@ export interface AppState {
   addEngineLog: (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
   cacheStats: { size: number, max: number };
   memories: { id: string; text: string; timestamp: string }[]; // <--- New State
+  
+  // Admin Features
+  adminProvider: 'gemini' | 'openai' | null;
+  setAdminProvider: (provider: 'gemini' | 'openai' | null) => void;
 
   // Actions
   addHistoryItem: (item: ChatMessage) => Promise<void>;
@@ -143,6 +147,8 @@ export const useStore = create<AppState>((set, get) => ({
   },
   
   typedText: '',
+  adminProvider: null,
+  setAdminProvider: (p) => set({ adminProvider: p }),
   memories: [], // Init empty
   pictureCategory: null,
   setPictureCategory: (cat) => set({ pictureCategory: cat }),
@@ -235,7 +241,9 @@ export const useStore = create<AppState>((set, get) => ({
                     userProfile: state.userProfile,
                     schedule: relevantSchedule,
                     // Signal 4: Top 20 Habits
-                    habits: state.habits.slice(0, 20)
+                    habits: state.habits.slice(0, 20),
+                    // Admin Override
+                    provider: state.adminProvider
                 })
             });
 

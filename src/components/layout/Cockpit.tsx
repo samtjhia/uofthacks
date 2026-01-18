@@ -388,7 +388,6 @@ export default function Cockpit() {
       </div>
       {showTimePicker && (
         <TimePicker 
-          initialTime={getInitialTimeForBlock()}
           initialDuration={30}
           onConfirm={handleTimeConfirm}
           onCancel={() => setShowTimePicker(false)}

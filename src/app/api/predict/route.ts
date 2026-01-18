@@ -7,7 +7,7 @@ import { searchMemory } from '@/lib/memory';
 
 export async function POST(req: NextRequest) {
   try {
-    const { text, history, time, schedule, userProfile, habits, mode, lastPartnerMessage } = await req.json();
+    const { text, history, time, schedule, userProfile, habits, mode, lastPartnerMessage, provider } = await req.json();
 
     // 1. MEMORY ENGINE (Signal 3)
     // If the partner just spoke, search memory for context about what they said.
@@ -168,7 +168,8 @@ export async function POST(req: NextRequest) {
         const result = await generateCompletion(
             "You are a predictive text engine. Output JSON only.",
             prompt,
-            true
+            true,
+            provider // Pass the admin override if present
         );
         rawText = result.text;
         usedModel = result.model;

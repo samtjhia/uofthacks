@@ -23,10 +23,39 @@ import {
 } from 'lucide-react';
 
 export default function LeftSidebar() {
-  const { history, fetchHistory, clearHistory, engineLogs, cacheStats, activeModel, memories, fetchMemories, clearMemories } = useStore((state: AppState) => state);
+  const { 
+    history, fetchHistory, clearHistory, 
+    engineLogs, addEngineLog, 
+    cacheStats, activeModel, 
+    memories, fetchMemories, clearMemories,
+    adminProvider, setAdminProvider   // <--- Added
+  } = useStore((state: AppState) => state);
   const [activeTab, setActiveTab] = useState<'history' | 'brain' | 'memory'>('history');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const dummyRef = useRef<HTMLDivElement>(null);
+
+  // Hidden Toggle for Admin Provider
+  const handleToggleProvider = async () => {
+     let next: 'gemini' | 'openai' | null = null;
+     if (adminProvider === null) next = 'gemini';
+     else if (adminProvider === 'gemini') next = 'openai';
+     else next = null; // Back to default
+
+     setAdminProvider(next);
+
+     const msg = `SYSTEM OVERRIDE: AI Model switched to ${next ? next.toUpperCase() : 'DEFAULT'}`;
+     addEngineLog(msg, 'warning');
+     
+     // Log to VS Code Terminal
+     try {
+       await fetch('/api/log', {
+         method: 'POST',
+         body: JSON.stringify({ message: msg })
+       });
+     } catch (e) {
+       console.error("Failed to log to server", e);
+     }
+  };
 
   useEffect(() => {
     fetchHistory();
@@ -186,9 +215,19 @@ export default function LeftSidebar() {
               {/* Stats Header */}
               <div className="shrink-0 p-4 border-b border-white/5 bg-slate-900/50 flex items-center justify-between">
                  <div className="flex gap-4">
-                    <div className="flex items-center gap-2 text-emerald-400">
+                    <div 
+                        onClick={handleToggleProvider}
+                        title="System Status"
+                        className={`flex items-center gap-2 transition-colors select-none ${
+                             adminProvider === 'gemini' ? 'text-blue-400' :
+                             adminProvider === 'openai' ? 'text-green-400' :
+                             'text-emerald-400'
+                        }`}
+                    >
                         <Zap className="w-3.5 h-3.5" />
-                        <span className="font-bold">ONLINE</span>
+                        <span className="font-bold">
+                            {adminProvider ? adminProvider.toUpperCase() : 'ONLINE'}
+                        </span>
                     </div>
                     <div className="flex items-center gap-2 text-slate-400">
                         <Database className="w-3.5 h-3.5" />

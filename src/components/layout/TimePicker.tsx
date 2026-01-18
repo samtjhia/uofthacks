@@ -8,13 +8,19 @@ interface TimePickerProps {
 }
 
 export const TimePicker: React.FC<TimePickerProps> = ({
-  initialTime = "12:00",
+  initialTime,
   initialDuration = 30,
   onConfirm,
   onCancel
 }) => {
-  const [hours, setHours] = useState(parseInt(initialTime.split(':')[0]) || 12);
-  const [minutes, setMinutes] = useState(parseInt(initialTime.split(':')[1]) || 0);
+  const [hours, setHours] = useState(() => {
+    if (initialTime) return parseInt(initialTime.split(':')[0]) || 12;
+    return new Date().getHours();
+  });
+  const [minutes, setMinutes] = useState(() => {
+    if (initialTime) return parseInt(initialTime.split(':')[1]) || 0;
+    return new Date().getMinutes();
+  });
   const [duration, setDuration] = useState(initialDuration);
 
   // Time manipulation helpers

@@ -7,7 +7,7 @@ import OpenAI from 'openai';
 export const ACTIVE_PROVIDER: 'gemini' | 'openai' = 'openai';
 
 // -- MODELS --
-const GEMINI_MODEL = 'gemini-1.5-flash';
+const GEMINI_MODEL = 'gemini-2.0-flash-exp';
 const OPENAI_MODEL = 'gpt-4o-mini';
 
 // --- INITIALIZATION ---
@@ -28,13 +28,15 @@ interface CompletionResult {
 export async function generateCompletion(
     systemPrompt: string, 
     userPrompt: string,
-    jsonMode: boolean = false
+    jsonMode: boolean = false,
+    providerOverride?: 'gemini' | 'openai'
 ): Promise<CompletionResult> {
     
-    console.log(`🧠 AI Request [${ACTIVE_PROVIDER.toUpperCase()}]`);
+    const provider = providerOverride || ACTIVE_PROVIDER;
+    console.log(`🧠 AI Request [${provider.toUpperCase()}]`);
 
     try {
-        if (ACTIVE_PROVIDER === 'openai') {
+        if (provider === 'openai') {
             const completion = await openai.chat.completions.create({
                 messages: [
                     { role: "system", content: systemPrompt },

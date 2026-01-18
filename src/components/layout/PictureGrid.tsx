@@ -225,11 +225,75 @@ function getTileColorClass(label: string, isFolder?: boolean): string {
   return 'bg-slate-800 border-slate-700/50 text-slate-200'
 }
 
+const MemoTile = React.memo(({ label, icon: Icon, color, onTileClick, isFolder, isDimmed, isRecommended }: { 
+  label: string, 
+  icon?: any, 
+  color?: string, 
+  onTileClick: (label: string, isFolder?: boolean) => void, 
+  isFolder?: boolean,
+  isDimmed?: boolean, // This means "visually deemphasized"
+  isRecommended?: boolean
+}) => {
+  // Determine background/border/text style
+  const colorClass = getTileColorClass(label, isFolder);
+  
+  // Check if we are using a specific colored background (not the default slate-800)
+  const hasColorBg = !colorClass.includes('bg-slate-800');
+  
+  // For folders (white bg), we want colored icons. For other colored tiles, we generally want dark icons.
+  // Use the passed `color` prop if available (for folders), otherwise dark if bg is light, otherwise light.
+  const iconClass = isFolder 
+     ? (color ? color.replace('text-', 'text-') : 'text-slate-900') // Keep original color for folders 
+     : (hasColorBg ? 'text-slate-900 opacity-80' : (color || 'text-slate-300'));
+
+  return (
+    <button 
+      onClick={() => onTileClick(label, isFolder)}
+      className={`
+        group flex flex-col items-center justify-center text-center
+        aspect-square w-full
+        rounded-2xl p-2
+        cursor-pointer
+        border transition-all duration-500
+        ${isDimmed ? 'opacity-60 scale-95 border-transparent shadow-none hover:opacity-100 hover:scale-100 hover:z-20' : ''}
+        ${isRecommended ? 'z-10 scale-110 shadow-[0_0_20px_rgba(56,189,248,0.5)] ring-4 ring-sky-400 brightness-110' : ''}
+        ${!isDimmed && !isRecommended ? 'hover:scale-105 hover:brightness-110 shadow-sm' : ''}
+        ${colorClass}
+      `}
+    >
+      {Icon && (
+        <Icon className={`w-8 h-8 mb-1 ${iconClass}`} />
+      )}
+      <span className="text-xs sm:text-sm font-bold leading-tight break-words line-clamp-2">
+        {label}
+      </span>
+    </button>
+  );
+});
+MemoTile.displayName = 'Tile';
+
 export default function PictureGrid({ onSelect }: PictureGridProps) {
-  const { pictureCategory, setPictureCategory, addCustomItem, setCustomItems } = useStore();
+  const { 
+    pictureCategory, setPictureCategory, addCustomItem, setCustomItems, 
+    isHighlightEnabled, suggestions, typedText, learnTransition 
+  } = useStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newWord, setNewWord] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Ref for typedText to prevent re-creating handleTileClick on every keystroke
+  const typedTextRef = React.useRef(typedText);
+  useEffect(() => { typedTextRef.current = typedText; }, [typedText]);
+
+  // TRIGGER PREDICTIONS ON TYPING (The Missing Link for Signal Brain)
+  // When text changes, we want to refresh predictions so the grid highlights update based on the new context
+  useEffect(() => {
+    // Only fetch if meaningful change and we are not in infinite loop
+    const state = useStore.getState(); // Get fresh state
+    if (state.inputMode !== 'spark' && typedText.trim().length > 0) {
+        state.refreshPredictions(typedText); // This debounces internally in store if called rapidly
+    }
+  }, [typedText]);
 
   // Load custom icons from DB on mount
   useEffect(() => {
@@ -309,10 +373,6 @@ export default function PictureGrid({ onSelect }: PictureGridProps) {
     }
   };
 
-  if (pictureCategory) {
-    return <CategoryGrid category={pictureCategory} />;
-  }
-  
   // Desired fixed rows and ordering
   const FIRST_ROW = ['I','is','can','will','do','have','what','where','who','not','more'];
   const SECOND_ROW = ['you','we','want','like','need','get','to','with','in','now','all done'];
@@ -334,105 +394,131 @@ export default function PictureGrid({ onSelect }: PictureGridProps) {
     !loweredFifth.has(q.label.toLowerCase())
   );
 
-  const Tile = ({ label, icon: Icon, color, onClick, isFolder }: { label: string, icon?: any, color?: string, onClick: () => void, isFolder?: boolean }) => {
-    // Determine background/border/text style
-    const colorClass = getTileColorClass(label, isFolder);
+  // Optimization: Calculate recommendations once per store update
+  const recommendedSet = React.useMemo(() => {
+    // FIX: Optimized calculation - only runs when typedText or suggestions change
+    if (!suggestions.length || typedText.trim().length === 0) return new Set<string>();
     
-    // Check if we are using a specific colored background (not the default slate-800)
-    const hasColorBg = !colorClass.includes('bg-slate-800');
+    const recs = new Set<string>();
+    const loweredSuggestions = suggestions.map(s => s.label.toLowerCase());
+
+    const checkAndAdd = (label: string) => {
+        const lbl = label.toLowerCase();
+        // Check exact match or if it's part of the suggestion phrase
+        const isMatch = loweredSuggestions.some(sug => {
+            if (sug === lbl || sug.startsWith(lbl)) return true;
+            return sug.includes(` ${lbl} `) || sug.endsWith(` ${lbl}`) || sug.startsWith(`${lbl} `);
+        });
+        if (isMatch) recs.add(label);
+    };
+
+    FIRST_ROW.forEach(checkAndAdd);
+    SECOND_ROW.forEach(checkAndAdd);
+    THIRD_ROW.forEach(checkAndAdd);
+    FOURTH_ROW.forEach(checkAndAdd);
+    FIFTH_ROW.forEach(checkAndAdd);
+    remainingQuick.forEach(q => checkAndAdd(q.label));
+    CATEGORIES.forEach(c => checkAndAdd(c.label));
     
-    // For folders (white bg), we want colored icons. For other colored tiles, we generally want dark icons.
-    // Use the passed `color` prop if available (for folders), otherwise dark if bg is light, otherwise light.
-    const iconClass = isFolder 
-       ? (color ? color.replace('text-', 'text-') : 'text-slate-900') // Keep original color for folders 
-       : (hasColorBg ? 'text-slate-900 opacity-80' : (color || 'text-slate-300'));
+    return recs;
+  }, [suggestions, typedText, remainingQuick]);
+
+  const handleTileClick = React.useCallback((label: string, isFolder?: boolean) => {
+    if (label === "Add Word") {
+        setIsModalOpen(true);
+        return;
+    }
+    if (isFolder) {
+        const cat = CATEGORIES.find(c => c.label === label);
+        if (cat) setPictureCategory(cat.id);
+    } else {
+        // --- LEARNING REMOVED (Moved to 'Speak' action) ---
+        // We only learn when the user commits to the full sentence.
+        /*
+        const currentBuffer = typedTextRef.current.trim();
+        if (currentBuffer.length > 0) {
+            const words = currentBuffer.split(/\s+/);
+            const contextWord = words[words.length - 1]; 
+            if (learnTransition) {
+                 learnTransition(contextWord, label);
+            }
+        }
+        */
+        
+        onSelect(label);
+    }
+  }, [onSelect, setPictureCategory, setIsModalOpen, learnTransition]);
+
+  const renderTile = React.useCallback((label: string, icon: any, color?: string, isFolder: boolean = false) => {
+    // Basic booleans
+    // FIX: Only show recommendations if Highlight is enabled
+    const isRecommended = isHighlightEnabled && recommendedSet.has(label);
+    
+    // Since we moved this hook up, we must ensure these variables are accessible or re-access from store
+    // actually 'suggestions' and 'typedText' are in scope from useStore
+    const hasSuggestions = suggestions.length > 0 && typedText.trim().length > 0;
+    const isDimmed = isHighlightEnabled && hasSuggestions && !isRecommended;
 
     return (
-    <button 
-      onClick={onClick}
-      className={`
-        group flex flex-col items-center justify-center text-center
-        aspect-square w-full
-        rounded-2xl p-2
-        border hover:brightness-110 hover:scale-105 transition-all shadow-sm
-        ${colorClass} // Apply the determined background/text colors
-      `}
-    >
-      {Icon && (
-        <Icon className={`w-8 h-8 mb-1 ${iconClass}`} />
-      )}
-      <span className="text-xs sm:text-sm font-bold leading-tight break-words line-clamp-2">
-        {label}
-      </span>
-    </button>
-  );
-  };
+      <MemoTile
+        key={label}
+        label={label}
+        icon={icon}
+        color={color}
+        onTileClick={handleTileClick}
+        isFolder={isFolder}
+        isDimmed={isDimmed} // Just semantic
+        isRecommended={isRecommended}
+      />
+    );
+  }, [recommendedSet, isHighlightEnabled, suggestions.length, typedText.length, handleTileClick]);
+
+  if (pictureCategory) {
+    return <CategoryGrid category={pictureCategory} />;
+  }
 
   return (
-    <div className="w-full h-full overflow-y-auto p-4 custom-scrollbar flex flex-col gap-2">
+    <div className="w-full h-full overflow-y-auto p-4 custom-scrollbar flex flex-col gap-2 relative">
+      
       {/* Top fixed rows */}
       <div className="grid grid-cols-11 gap-2">
-        {FIRST_ROW.map((label) => (
-          <Tile key={label} label={label} icon={WORD_ICONS[label]} onClick={() => onSelect(label)} />
-        ))}
+        {FIRST_ROW.map((label) => renderTile(label, WORD_ICONS[label]))}
       </div>
 
       <div className="grid grid-cols-11 gap-2">
-        {SECOND_ROW.map((label) => (
-          <Tile key={label} label={label} icon={WORD_ICONS[label]} onClick={() => onSelect(label)} />
-        ))}
+        {SECOND_ROW.map((label) => renderTile(label, WORD_ICONS[label]))}
       </div>
 
       <div className="grid grid-cols-11 gap-2">
-        {THIRD_ROW.map((label) => (
-          <Tile key={label} label={label} icon={WORD_ICONS[label]} onClick={() => onSelect(label)} />
-        ))}
+        {THIRD_ROW.map((label) => renderTile(label, WORD_ICONS[label]))}
       </div>
 
       <div className="grid grid-cols-11 gap-2">
-        {FOURTH_ROW.map((label) => (
-          <Tile key={label} label={label} icon={WORD_ICONS[label]} onClick={() => onSelect(label)} />
-        ))}
+        {FOURTH_ROW.map((label) => renderTile(label, WORD_ICONS[label]))}
       </div>
 
       <div className="grid grid-cols-11 gap-2">
-        {FIFTH_ROW.map((label) => (
-          <Tile key={label} label={label} icon={WORD_ICONS[label]} onClick={() => onSelect(label)} />
-        ))}
+        {FIFTH_ROW.map((label) => renderTile(label, WORD_ICONS[label]))}
       </div>
 
       {/* Remaining quick items */}
       <div className="grid grid-cols-11 gap-2">
-        {remainingQuick.map((item) => (
-          <Tile 
-            key={item.id} 
-            label={item.label} 
-            icon={item.icon} 
-            color={item.color} 
-            onClick={() => onSelect(item.label)} 
-          />
-        ))}
+        {remainingQuick.map((item) => renderTile(item.label, item.icon, item.color))}
       </div>
 
       {/* Categories (folders) at the very end */}
       <div className="grid grid-cols-11 gap-2">
-        {CATEGORIES.map((cat) => (
-          <Tile 
-            key={cat.id} 
-            label={cat.label} 
-            icon={cat.icon} 
-            color={cat.color} 
-            isFolder
-            onClick={() => setPictureCategory(cat.id)} 
-          />
-        ))}
-        <Tile 
-          label="Add Word" 
-          icon={Plus} 
-          isFolder 
-          color="text-slate-500" 
-          onClick={() => setIsModalOpen(true)} 
-        />
+        {CATEGORIES.map((cat) => renderTile(cat.label, cat.icon, cat.color, true))}
+        
+        {/* Spacer to push Add Word to the corner (11th col) */}
+        <div className="w-full aspect-square" />
+        <button 
+           onClick={() => setIsModalOpen(true)}
+           className="group flex flex-col items-center justify-center text-center aspect-square w-full rounded-2xl p-2 cursor-pointer border border-dashed border-slate-600 bg-slate-800/40 text-slate-400 hover:text-white hover:border-sky-500 hover:bg-slate-800 transition-all"
+        >
+           <Plus className="w-8 h-8 mb-1 opacity-60 group-hover:opacity-100" />
+           <span className="text-xs font-bold leading-tight">Add Word</span>
+        </button>
       </div>
 
       {isModalOpen && (
@@ -446,7 +532,14 @@ export default function PictureGrid({ onSelect }: PictureGridProps) {
               className="w-full bg-slate-800 text-white placeholder-slate-500 rounded-xl px-4 py-3 mb-4 focus:ring-2 focus:ring-sky-500 outline-none border border-slate-700"
               placeholder="Type a word (e.g. Banana)"
               value={newWord}
-              onChange={(e) => setNewWord(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                // Title Case each word (e.g. "red apple" -> "Red Apple")
+                const formatted = val.split(' ').map(word => 
+                    word.length > 0 ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() : ''
+                ).join(' ');
+                setNewWord(formatted);
+              }}
               onKeyDown={(e) => e.key === 'Enter' && handleCreateWord()}
             />
             
@@ -469,7 +562,7 @@ export default function PictureGrid({ onSelect }: PictureGridProps) {
                     <span>Creating...</span>
                   </>
                 ) : (
-                  <span>Create Magic</span>
+                  <span>Create Icon</span>
                 )}
               </button>
             </div>

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
 import { SuggestionResponse } from '@/types';
+import connectToDatabase from '@/lib/db';
+import { Transition } from '@/lib/models';
 
 // --- CONFIGURATION ---
 // Change this to 'gemini' or 'openai' to switch providers
@@ -25,6 +27,45 @@ export async function POST(req: NextRequest) {
     }
     if (ACTIVE_PROVIDER === 'openai' && !process.env.OPENAI_API_KEY) {
        return NextResponse.json({ error: 'OPENAI_API_KEY not configured' }, { status: 500 });
+    }
+
+    // --- SIGNAL 5: LEARNED TRANSITIONS (DB CHECK) ---
+    // Optimization: If we have strong user habits, use DB results (50ms) instead of LLM (1.5s).
+    await connectToDatabase();
+    let learnedContext = "";
+    
+    // Only attempt Reflex if we have input text to pivot from
+    if (text && text.trim().length > 0) {
+        // --- PATH-BASED LEARNING UPDATE ---
+        // Instead of just the last word, we use the ENTIRE TYPED PATH as context.
+        // If user typed "i want", we look for context="i want" -> next="to"
+        const fullContextPath = text.trim().toLowerCase();
+        
+        try {
+            // Find transitions where 'context' matches our full path
+            const transitions = await Transition.find({ context: fullContextPath })
+                                            .sort({ count: -1, lastUsed: -1 })
+                                            .limit(12); // Get top choices
+            
+            // REFLEX CIRCUIT: If we have ANY learned data, return it immediately.
+            if (transitions.length > 0) {
+                 const reflexSuggestions = transitions.map(t => ({
+                    id: t._id.toString(),
+                    label: t.next, 
+                    text: t.next, 
+                    type: 'reflex' // Special type indicating DB source
+                 }));
+
+                 return NextResponse.json({
+                    thought_process: `⚡ REFLEX ACTIVATED: Exact path match found for "${fullContextPath}".`,
+                    suggestions: reflexSuggestions,
+                    model: 'Reflex (DB)'
+                 });
+            }
+        } catch (dbErr) {
+            console.warn("Reflex DB Lookup failed:", dbErr);
+            // Continue to LLM as fallback
+        }
     }
 
 

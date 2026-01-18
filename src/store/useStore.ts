@@ -177,7 +177,8 @@ export const useStore = create<AppState>((set, get) => ({
         const inputMode = state.inputMode;
         const isSpark = inputMode === 'spark';
 
-        const text = isSpark ? '' : (textOverride !== undefined ? textOverride : state.typedText);
+        // Use typed text if override not provided. Spark mode relies on setInputMode passing '' if it wants to clear.
+        const text = (textOverride !== undefined ? textOverride : state.typedText);
         
         // Start Loading State
         set({ isPredicting: true });
@@ -191,8 +192,8 @@ export const useStore = create<AppState>((set, get) => ({
             const relevantSchedule = state.scheduleItems.map(i => `${i.timeBlock}: ${i.label}`).join(', ');
 
             // Get recent history for context (last 3 messages is usually enough for immediate context)
-            // If in Spark mode, we intentionally IGNORE history to provide fresh starters
-            const recentHistory = isSpark ? '' : state.history.slice(-3).map(m => `${m.role}: ${m.content}`).join('\n');
+            // UPDATE: Send history even in Spark mode so it knows the conversation flow (Signal 1)
+            const recentHistory = state.history.slice(-3).map(m => `${m.role}: ${m.content}`).join('\n');
             
             // EXTRACT LAST PARTNER MESSAGE (Signal 1 - Explicit)
             // Look for the last message that is NOT from the user.

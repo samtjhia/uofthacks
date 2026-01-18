@@ -85,105 +85,81 @@ export async function POST(req: NextRequest) {
     }
 
     let prompt = "";
+    
+    // Config based on mode
+    const isSpark = mode === 'spark';
+    const outputCount = isSpark ? 12 : 4;
+    
+    // Spark mode relaxes the "Starts with..." constraint to allow for diverse ideas if text is empty/irrelevant
+    const filterDirective = isSpark 
+        ? `1. **Signal 6 [The Filter]**: Soft Constraint. If input "${text}" exists, prefer words starting with it. If empty, generate ${outputCount} distinct conversation starters.`
+        : `1. **Signal 6 [The Filter]**: HARD CONSTRAINT. Predictions MUST start with the user's current input: "${text}". \n         - **EXCEPTION**: If input is EMPTY, predict ${outputCount} distinct conversation starters based on Schedule/History/Time.`;
 
-    if (mode === 'spark') {
-        prompt = `
-          # Role: ThoughtFlow Spark Engine (Conversation Starters)
-          Your goal is to generate 12 engaging "Conversation Starters" based purely on the user's current context (Time, Schedule, Mood/Profile).
-          
-          # Context Signals:
-          ${systemContext}
+    prompt = `
+      # Role: ThoughtFlow Predictive Component (Context-Aware AAC)
+      You are an advanced predictive engine for users with speech impairments. Your job is to predict the user's *intended next word* by fusing 5 real-time context signals.
+      
+      # The 5 Signals (Hierarchy of Importance):
+      ${filterDirective}
+      2. **Signal 1 [The Listener]**: **CRITICAL - MAXIMUM PRIORITY**. If the last history message is from 'partner' or is a QUESTION, your main job is to answer it. Ignoring a direct question is a failure.
+      3. **Signal 3 [The Memory]**: Long-Term Info. Use this to answer specific factual questions (e.g., "When is the wedding?"). 
+         - **WARNING**: Treat each retrieved Fact as ATOMIC. Do NOT merge unrelated facts (e.g. do not combine "I work at X" with "My favorite color is Y" unless the user asks for both).
+      4. **Signal 4 [The Habits]**: High Priority. Users repeat themselves. If a frequent habit matches the input/context, it wins.
+      5. **Signal 2 [The Scheduler]**: Context Booster. If the schedule says "Art Class", boost words like "paint", "color", "canvas".
+      6. **Signal 5 [The Grammar]**: Syntactic Validity. Ensure the sentence makes grammatical sense.
 
-          # Instructions:
-          - IGNORE previous chat history. We are starting a NEW topic.
-          - IGNORE any typed text. The user is asking for fresh ideas.
-          - Focus heavily on the **Schedule** and **Time**.
-          - If the schedule says "Lunch", suggest food-related openers.
-          - If the time is morning, suggest greetings.
-          - If no specific schedule, use general social openers suitable for the user's profile.
+      # Current State Signals
+      ${systemContext}
+      [Signal 1 - Recent History (MOST IMPORTANT FOR CONTEXT)]:
+      ${history || "None"}
 
-          # Output Format (JSON Only):
-          {
-            "thought_process": "Why you chose these starters based on schedule/time.",
-            "predictions": [
-              { "word": "Topic With Spaces", "sentence": "Full conversational starter sentence." },
-              { "word": "Another Topic", "sentence": "Full conversational starter sentence." },
-              // ... generate 12 total
-            ]
-          }
+      [Signal 3 - Retrieved Memories (Long-Term Facts)]:
+      ${memoryContext || "No relevant memories found."}
+      
+      [Signal 1.5 - LATEST PARTNER MESSAGE (The Trigger)]:
+      "${lastPartnerMessage || "None"}"
 
-          # Guidelines for 'word':
-          - **Use Title Case and SPACES**. (e.g., "Dining Experience", NOT "DININGEXPERIENCE").
-          - Keep it short (2-3 words max).
-        `;
-    } else {
-        prompt = `
-          # Role: ThoughtFlow Predictive Component (Context-Aware AAC)
-          You are an advanced predictive engine for users with speech impairments. Your job is to predict the user's *intended next word* by fusing 5 real-time context signals.
-          
-          # The 5 Signals (Hierarchy of Importance):
-          1. **Signal 6 [The Filter]**: HARD CONSTRAINT. Predictions MUST start with the user's current input: "${text}". 
-             - **EXCEPTION**: If input is EMPTY, predict 4 distinct conversation starters based on Schedule/History/Time.
-          2. **Signal 1 [The Listener]**: **CRITICAL - MAXIMUM PRIORITY**. If the last history message is from 'partner' or is a QUESTION, your main job is to answer it. Ignoring a direct question is a failure.
-          3. **Signal 3 [The Memory]**: Long-Term Info. Use this to answer specific factual questions (e.g., "When is the wedding?"). 
-             - **WARNING**: Treat each retrieved Fact as ATOMIC. Do NOT merge unrelated facts (e.g. do not combine "I work at X" with "My favorite color is Y" unless the user asks for both).
-          4. **Signal 4 [The Habits]**: High Priority. Users repeat themselves. If a frequent habit matches the input/context, it wins.
-          5. **Signal 2 [The Scheduler]**: Context Booster. If the schedule says "Art Class", boost words like "paint", "color", "canvas".
-          6. **Signal 5 [The Grammar]**: Syntactic Validity. Ensure the sentence makes grammatical sense.
+      [Signal 4 - Habit Bank]:
+      ${habits && habits.length > 0 ? habits.slice(0, 50).join(', ') : "None provided"}
 
-          # Current State Signals
-          ${systemContext}
-          [Signal 1 - Recent History (MOST IMPORTANT FOR CONTEXT)]:
-          ${history || "None"}
+      [Signal 6 - Current Input Buffer]:
+      "${text}"
 
-          [Signal 3 - Retrieved Memories (Long-Term Facts)]:
-          ${memoryContext || "No relevant memories found."}
-          
-          [Signal 1.5 - LATEST PARTNER MESSAGE (The Trigger)]:
-          "${lastPartnerMessage || "None"}"
+      # Prediction Algorithm (Execute Step-by-Step):
+      1. **Status Check**: Is the input "${text}" empty?
+      2. **IF INPUT IS EMPTY**: 
+         - **FOCUS ON [Signal 1.5 - LATEST PARTNER MESSAGE]**: This is the message you are responding to. Ignore older history if this is present.
+         - **CASE A: Partner Message is a QUESTION**: Your ${outputCount} predictions MUST be direct answers to it.
+            - **CRITICAL**: Check [Signal 3 - Retrieved Memories]. If a memory provides the answer (e.g. Question: "What is my fav color?", Memory: "Sam's fav color is green"), you MUST provide that answer as the Top Prediction.
+         - **CASE B: Partner Message is a STATEMENT/GREETING** (e.g. "Hello there"): Your predictions MUST be relevant follow-ups/replies.
+         - **CASE C: No Partner Message**: Suggest conversational starters based on Schedule/Location.
+      3. **IF INPUT IS NOT EMPTY**:
+         - Filter suggested habits/words to strictly start with "${text}".
+         - Prioritize words that *complete the answer* to the previous question if applicable.
+      
+      # Output Format
+      Return a SINGLE JSON object. No markdown.
+      {
+        "thought_process": "Explain why you chose these words. If History was used, explicitly mention 'Answering Question: [Question]'.",
+        "predictions": [
+          { "word": "Label1", "sentence": "Complete, conversational sentence." },
+          { "word": "Label2", "sentence": "Complete, conversational sentence." },
+          // ...
+          { "word": "Label4", "sentence": "Complete, conversational sentence." }
+        ]
+      }
 
-          [Signal 4 - Habit Bank]:
-          ${habits && habits.length > 0 ? habits.slice(0, 50).join(', ') : "None provided"}
+      # Guidelines for 'word' field:
+      - This appears in a small bubble. Keep it SHORT (1-2 words max).
+      - Do NOT use slashes or prefixes like "Icon/". Just the word itself.
 
-          [Signal 6 - Current Input Buffer]:
-          "${text}"
-
-          # Prediction Algorithm (Execute Step-by-Step):
-          1. **Status Check**: Is the input "${text}" empty?
-          2. **IF INPUT IS EMPTY**: 
-             - **FOCUS ON [Signal 1.5 - LATEST PARTNER MESSAGE]**: This is the message you are responding to. Ignore older history if this is present.
-             - **CASE A: Partner Message is a QUESTION**: Your 4 predictions MUST be direct answers to it.
-                - **CRITICAL**: Check [Signal 3 - Retrieved Memories]. If a memory provides the answer (e.g. Question: "What is my fav color?", Memory: "Sam's fav color is green"), you MUST provide that answer as the Top Prediction.
-             - **CASE B: Partner Message is a STATEMENT/GREETING** (e.g. "Hello there"): Your predictions MUST be relevant follow-ups/replies.
-             - **CASE C: No Partner Message**: Suggest conversational starters based on Schedule/Location.
-          3. **IF INPUT IS NOT EMPTY**:
-             - Filter suggested habits/words to strictly start with "${text}".
-             - Prioritize words that *complete the answer* to the previous question if applicable.
-          
-          # Output Format
-          Return a SINGLE JSON object. No markdown.
-          {
-            "thought_process": "Explain why you chose these words. If History was used, explicitly mention 'Answering Question: [Question]'.",
-            "predictions": [
-              { "word": "Label1", "sentence": "Complete, conversational sentence." },
-              { "word": "Label2", "sentence": "Complete, conversational sentence." },
-              // ...
-              { "word": "Label4", "sentence": "Complete, conversational sentence." }
-            ]
-          }
-
-          # Guidelines for 'word' field:
-          - This appears in a small bubble. Keep it SHORT (1-2 words max).
-          - Do NOT use slashes or prefixes like "Icon/". Just the word itself.
-
-          # Guidelines for 'sentence' field:
-          - **Conversational**: Must be a natural thing to say.
-          - **Expansion**: If 'word' is "Water", 'sentence' must be "I need some water please" or "Can I get a drink?". NEVER just "Water".
-          - **Grammar**: Fix articles and pronouns. (e.g., "to face" -> "to my face").
-          - **Variety**: If reasonable, offer slightly different intents for the same word, or varied phrasing.
-          - **Completeness**: Even if the user only typed a few letters, the 'sentence' should be the FULL thought.
-        `;
-    }
+      # Guidelines for 'sentence' field:
+      - **Conversational**: Must be a natural thing to say.
+      - **Expansion**: If 'word' is "Water", 'sentence' must be "I need some water please" or "Can I get a drink?". NEVER just "Water".
+      - **Grammar**: Fix articles and pronouns. (e.g., "to face" -> "to my face").
+      - **Variety**: If reasonable, offer slightly different intents for the same word, or varied phrasing.
+      - **Completeness**: Even if the user only typed a few letters, the 'sentence' should be the FULL thought.
+    `;
 
     let rawText = "";
     let usedModel = "";

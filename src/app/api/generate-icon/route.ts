@@ -17,7 +17,7 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         model: "dall-e-3",
-        prompt: `A simple, flat vector icon of ${word}, minimal design, solid color, black background, suitable for an AAC communication board.`,
+        prompt: `A simple, flat vector icon of ${word}, minimal design, solid color, solid white background, suitable for an AAC communication board.`,
         n: 1,
         size: "1024x1024",
         response_format: "b64_json" 

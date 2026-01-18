@@ -10,7 +10,7 @@ export default function WaveformVisualizer({ isActive }: WaveformVisualizerProps
   const barsCount = 30;
 
   return (
-    <div className="flex items-end justify-center gap-1 h-full w-full px-10 pb-2">
+    <div className="flex items-center justify-center gap-1 h-full w-full px-10 pt-7">
       {Array.from({ length: barsCount }).map((_, i) => {
         // Calculate symmetry and multiplier
         const center = barsCount / 2;
@@ -36,8 +36,8 @@ export default function WaveformVisualizer({ isActive }: WaveformVisualizerProps
             key={i}
             className={`flex-1 rounded-full transition-[height] duration-75 ease-out ${
               isActive 
-                ? 'bg-gradient-to-t from-emerald-500 to-cyan-400 shadow-[0_0_10px_rgba(52,211,153,0.3)]' 
-                : 'bg-slate-700/50'
+                ? 'bg-gradient-to-t from-crimson to-rose-400 shadow-[0_0_15px_rgba(220,38,38,0.3)]' 
+                : 'bg-clay-300'
             }`}
             style={{ height: `${barHeight}%` }}
           />

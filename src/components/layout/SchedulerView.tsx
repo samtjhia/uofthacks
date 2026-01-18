@@ -73,28 +73,28 @@ export default function SchedulerView() {
       id: 'morning' as const,
       label: 'Morning',
       timeRange: '5:00 AM - 12:00 PM',
-      icon: <Sun className="w-5 h-5 text-amber-400" />,
-      color: 'bg-amber-500/10 border-amber-500/20 text-amber-100',
-      activeBorder: 'ring-2 ring-amber-400 shadow-[0_0_30px_rgba(251,191,36,0.3)]',
-      barColor: 'bg-amber-400'
+      icon: <Sun className="w-5 h-5 text-amber-500" />,
+      color: 'bg-amber-50/50 border-amber-200 text-amber-900',
+      activeBorder: 'ring-2 ring-amber-400 shadow-[0_0_30px_rgba(251,191,36,0.2)] bg-amber-50',
+      barColor: 'bg-amber-500'
     },
     {
       id: 'afternoon' as const,
       label: 'Afternoon',
       timeRange: '12:00 PM - 5:00 PM',
-      icon: <Sun className="w-5 h-5 text-orange-400" />,
-      color: 'bg-orange-500/10 border-orange-500/20 text-orange-100',
-      activeBorder: 'ring-2 ring-orange-400 shadow-[0_0_30px_rgba(251,146,60,0.3)]',
-      barColor: 'bg-orange-400'
+      icon: <Sun className="w-5 h-5 text-orange-500" />,
+      color: 'bg-orange-50/50 border-orange-200 text-orange-900',
+      activeBorder: 'ring-2 ring-orange-400 shadow-[0_0_30px_rgba(251,146,60,0.2)] bg-orange-50',
+      barColor: 'bg-orange-500'
     },
     {
       id: 'evening' as const,
       label: 'Evening',
       timeRange: '5:00 PM - 5:00 AM',
-      icon: <Moon className="w-5 h-5 text-indigo-400" />,
-      color: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-100',
-      activeBorder: 'ring-2 ring-indigo-400 shadow-[0_0_30px_rgba(129,140,248,0.3)]',
-      barColor: 'bg-indigo-400'
+      icon: <Moon className="w-5 h-5 text-indigo-500" />,
+      color: 'bg-indigo-50/50 border-indigo-200 text-indigo-900',
+      activeBorder: 'ring-2 ring-indigo-400 shadow-[0_0_30px_rgba(129,140,248,0.2)] bg-indigo-50',
+      barColor: 'bg-indigo-500'
     }
   ];
 
@@ -121,18 +121,18 @@ export default function SchedulerView() {
           return (
             <div 
               key={block.id} 
-              className={`rounded-3xl border flex flex-col backdrop-blur-sm transition-all duration-500 overflow-hidden ${block.color} ${isActive ? block.activeBorder : 'opacity-80 scale-95 md:scale-100 grayscale-[0.3]'}`}
+              className={`rounded-[2rem] border flex flex-col backdrop-blur-sm transition-all duration-500 overflow-hidden ${block.color} ${isActive ? block.activeBorder : 'opacity-80 scale-95 md:scale-100 grayscale-[0.3]'}`}
             >
               
               {/* Header */}
-              <div className="p-4 border-b border-white/5 flex items-center justify-between shrink-0 relative z-30 bg-inherit/50 backdrop-blur-md">
+              <div className="p-4 border-b border-black/5 flex items-center justify-between shrink-0 relative z-30 bg-inherit/30 backdrop-blur-md">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center shadow-inner">
+                  <div className="w-10 h-10 rounded-full bg-white/40 flex items-center justify-center shadow-sm">
                     {block.icon}
                   </div>
                   <div>
-                    <span className="font-bold text-lg block leading-tight">{block.label}</span>
-                    <span className="text-xs opacity-60 font-mono tracking-wider">{block.timeRange}</span>
+                    <span className="font-bold text-lg block leading-tight text-inherit">{block.label}</span>
+                    <span className="text-xs opacity-60 font-mono tracking-wider text-inherit">{block.timeRange}</span>
                   </div>
                 </div>
               </div>
@@ -150,7 +150,7 @@ export default function SchedulerView() {
                          color: block.id === 'morning' ? '#fbbf24' : block.id === 'afternoon' ? '#fb923c' : '#818cf8'
                        }}
                     >
-                        <div className="absolute right-2 -top-3 text-[10px] font-bold bg-black/50 px-2 py-0.5 rounded backdrop-blur-md border border-white/10 text-white">
+                        <div className="absolute right-2 -top-3 text-[10px] font-bold bg-clay-900/90 px-2 py-0.5 rounded backdrop-blur-md border border-white/10 text-white">
                             NOW
                         </div>
                         <div className="absolute -left-1 -top-1 w-2.5 h-2.5 rounded-full bg-white shadow-md" />
@@ -161,7 +161,7 @@ export default function SchedulerView() {
                   <div className="flex-1 p-3 flex flex-col gap-2 overflow-y-auto scrollbar-hide relative z-10">
                     {/* Empty State */}
                     {items.length === 0 && (
-                        <div className="flex-1 flex flex-col items-center justify-center opacity-30 text-center p-4">
+                        <div className="flex-1 flex flex-col items-center justify-center opacity-30 text-center p-4 text-clay-600">
                             <Clock className="w-8 h-8 mb-2" />
                             <span className="text-sm">No activities planned</span>
                         </div>
@@ -179,10 +179,10 @@ export default function SchedulerView() {
                       <div key={task._id} className="group relative shrink-0">
                         <button
                           onClick={() => setTypedText(task.label)}
-                          className={`w-full p-3 rounded-2xl border transition-all text-left flex items-center gap-3 pr-10
+                          className={`w-full p-3 rounded-[1.2rem] border transition-all text-left flex items-center gap-3 pr-10
                             ${isNow 
-                              ? 'bg-emerald-500/20 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]' 
-                              : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/20 active:scale-[0.98]'
+                              ? 'bg-emerald-100 border-emerald-200 shadow-md ring-1 ring-emerald-300' 
+                              : 'bg-white border-white shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98]'
                             }
                           `}
                         >
@@ -192,12 +192,12 @@ export default function SchedulerView() {
                                     e.stopPropagation();
                                     setEditingItem(task);
                                   }}
-                                  className={`flex flex-col items-center justify-center px-2 py-1 rounded-lg border min-w-[5rem] shrink-0 cursor-pointer hover:bg-white/10 transition-colors
-                                    ${isNow ? 'bg-emerald-900/40 border-emerald-500/30' : 'bg-black/20 border-white/5'}
+                                  className={`flex flex-col items-center justify-center px-2 py-1 rounded-lg border min-w-[5rem] shrink-0 cursor-pointer hover:bg-black/5 transition-colors
+                                    ${isNow ? 'bg-emerald-200/50 border-emerald-300' : 'bg-clay-50 border-clay-100'}
                                   `}
                                >
-                                 <span className={`text-sm font-bold font-mono ${isNow ? 'text-emerald-300' : 'text-sky-300'}`}>{task.startTime}</span>
-                                 <span className={`text-[10px] font-mono ${isNow ? 'text-emerald-400/60' : 'text-slate-500'}`}>
+                                 <span className={`text-sm font-bold font-mono ${isNow ? 'text-emerald-800' : 'text-clay-600'}`}>{task.startTime}</span>
+                                 <span className={`text-[10px] font-mono ${isNow ? 'text-emerald-700/60' : 'text-clay-400'}`}>
                                    - {renderEndTime(task)}
                                  </span>
                                </div>
@@ -207,14 +207,14 @@ export default function SchedulerView() {
                                    e.stopPropagation();
                                    setEditingItem(task);
                                  }}
-                                 className="flex flex-col items-center justify-center px-2 py-1 rounded-lg border border-dashed border-white/20 min-w-[5rem] shrink-0 cursor-pointer hover:bg-white/10 hover:border-white/40 transition-colors group/time"
+                                 className="flex flex-col items-center justify-center px-2 py-1 rounded-lg border border-dashed border-clay-300 min-w-[5rem] shrink-0 cursor-pointer hover:bg-clay-100 transition-colors group/time"
                                >
-                                  <span className="text-[10px] font-bold uppercase text-white/40 group-hover/time:text-white/80">Set Time</span>
+                                  <span className="text-[10px] font-bold uppercase text-clay-400 group-hover/time:text-clay-600">Set Time</span>
                                </button>
                             )}
-                            <span className={`font-medium text-lg leading-snug truncate w-full ${isNow ? 'text-emerald-100' : ''}`}>{task.label}</span>
+                            <span className={`font-medium text-lg leading-snug truncate w-full ${isNow ? 'text-emerald-900' : 'text-clay-900'}`}>{task.label}</span>
                             
-                            {isNow && <span className="absolute right-12 text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-900/50 px-2 py-1 rounded animate-pulse">Now</span>}
+                            {isNow && <span className="absolute right-12 text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-200/50 px-2 py-1 rounded animate-pulse">Now</span>}
                         </button>
                         
                         {/* Delete Button (Visible on Hover) */}
@@ -224,7 +224,7 @@ export default function SchedulerView() {
                                   e.stopPropagation();
                                   setEditingItem(task);
                               }}
-                              className="p-2 text-white/20 hover:text-sky-400 hover:bg-sky-500/10 rounded-lg transition-all"
+                              className="p-2 text-clay-400 hover:text-clay-900 hover:bg-clay-200 rounded-lg transition-all"
                           >
                               <Edit2 className="w-4 h-4" />
                           </button>
@@ -233,7 +233,7 @@ export default function SchedulerView() {
                                   e.stopPropagation();
                                   deleteScheduleItem(task._id);
                               }}
-                              className="p-2 text-white/20 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                              className="p-2 text-clay-400 hover:text-crimson hover:bg-crimson/10 rounded-lg transition-all"
                           >
                               <Trash2 className="w-4 h-4" />
                           </button>
@@ -250,7 +250,7 @@ export default function SchedulerView() {
                         setSchedulerAddingToBlock(block.id);
                         setTypedText(''); // Clear for new entry
                     }}
-                    className="w-full p-3 rounded-2xl border-2 border-dashed border-white/10 text-white/30 hover:text-white/60 hover:border-white/20 hover:bg-white/5 transition-all flex items-center justify-center gap-2"
+                    className="w-full p-3 rounded-[1.2rem] border-2 border-dashed border-clay-300/50 text-clay-500 hover:text-clay-800 hover:border-clay-400 hover:bg-clay-50/50 transition-all flex items-center justify-center gap-2"
                 >
                      <Plus className="w-5 h-5" />
                      <span className="font-medium">Add Activity</span>

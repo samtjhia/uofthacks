@@ -23,13 +23,13 @@ export default function VirtualKeyboard({ onKeyPress }: VirtualKeyboardProps) {
                 onClick={() => onKeyPress(key)}
                 className={`
                   relative group flex items-center justify-center
-                  rounded-xl font-semibold text-lg transition-all duration-200
+                  rounded-[1.2rem] font-semibold text-xl transition-all duration-200
                   ${isDel 
-                    ? 'flex-[1.5] bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white' 
-                    : 'flex-1 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-900/20'
+                    ? 'flex-[1.5] bg-crimson/10 text-crimson hover:bg-crimson hover:text-white' 
+                    : 'flex-1 bg-white text-clay-900 hover:bg-clay-50 hover:-translate-y-1 hover:shadow-lg hover:shadow-clay-500/10'
                   }
                   active:scale-95 active:translate-y-0
-                  shadow-sm border border-slate-700/50
+                  shadow-sm border border-white
                 `}
               >
                 {key}
@@ -44,9 +44,9 @@ export default function VirtualKeyboard({ onKeyPress }: VirtualKeyboardProps) {
         <button 
           onClick={() => onKeyPress('SPACE')}
           className="
-            w-1/2 rounded-xl bg-slate-800 text-slate-400 font-medium tracking-widest uppercase text-sm
-            hover:bg-slate-700 hover:text-white transition-all hover:shadow-lg
-            active:scale-[0.98] border border-slate-700/50
+            w-1/2 rounded-[1.2rem] bg-white text-clay-400 font-bold tracking-widest uppercase text-xs
+            hover:bg-clay-50 hover:text-clay-900 transition-all hover:shadow-lg hover:shadow-clay-500/10
+            active:scale-[0.98] border border-white shadow-sm
           "
         >
           Space

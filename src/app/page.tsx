@@ -11,43 +11,43 @@ export default function Home() {
   const { isLeftSidebarOpen, isRightSidebarOpen, toggleLeftSidebar, toggleRightSidebar } = useStore();
 
   return (
-    <main className="flex h-screen w-full bg-slate-950 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-foreground overflow-hidden font-sans">
+    <main className="flex h-screen w-full bg-clay-100 bg-dot-pattern text-clay-900 overflow-hidden font-sans p-3 gap-3">
       
       {/* LEFT SIDEBAR TRANSITION WRAPPER */}
-      <div className={`h-full transition-all duration-500 ease-[cubic-bezier(0.25,0.1,0.25,1)] overflow-hidden border-r border-white/5 ${isLeftSidebarOpen ? 'w-80 opacity-100' : 'w-0 opacity-0 border-none'}`}>
-        <div className="w-80 h-full bg-slate-950/40 backdrop-blur-xl">
+      <div className={`h-full transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isLeftSidebarOpen ? 'w-[320px] opacity-100 translate-x-0' : 'w-0 opacity-0 -translate-x-10'}`}>
+        <div className="w-[320px] h-full rounded-[2.5rem] overflow-hidden shadow-2xl shadow-clay-400/20 glass-panel border border-white/60">
            <LeftSidebar />
         </div>
       </div>
 
       {/* CENTER: THE COCKPIT */}
-      <section className="flex-1 flex flex-col relative h-full min-w-0">
+      <section className="flex-1 flex flex-col relative h-full min-w-0 rounded-[2.5rem] bg-white/40 shadow-xl shadow-clay-400/10 border border-white/60 backdrop-blur-3xl overflow-hidden">
          
-         {/* LEFT TOGGLE */}
+         {/* LEFT TOGGLE (Floating) */}
          <button 
            onClick={toggleLeftSidebar}
-           className="absolute left-0 top-1/2 -translate-y-1/2 z-50 py-8 pl-1 pr-2 bg-slate-800/80 backdrop-blur-md border-y border-r border-white/5 rounded-r-3xl text-white hover:bg-slate-700 hover:pl-2 transition-all shadow-xl shadow-black/20"
+           className={`absolute left-4 top-1/2 -translate-y-1/2 z-50 p-3 rounded-full bg-white/80 backdrop-blur-xl border border-white shadow-lg text-clay-900 hover:scale-110 transition-all ${isLeftSidebarOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
            title="Toggle Sidebar"
          >
-           {isLeftSidebarOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+           <ChevronRight className="w-5 h-5 opacity-60" />
+         </button>
+
+         {/* RIGHT TOGGLE (Floating) */}
+         <button 
+           onClick={toggleRightSidebar}
+           className={`absolute right-4 top-1/2 -translate-y-1/2 z-50 p-3 rounded-full bg-white/80 backdrop-blur-xl border border-white shadow-lg text-clay-900 hover:scale-110 transition-all ${isRightSidebarOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+           title="Toggle Sidebar"
+         >
+           <ChevronLeft className="w-5 h-5 opacity-60" />
          </button>
 
          <Cockpit />
 
-         {/* RIGHT TOGGLE */}
-         <button 
-           onClick={toggleRightSidebar}
-           className="absolute right-0 top-1/2 -translate-y-1/2 z-50 py-8 pr-1 pl-2 bg-slate-800/80 backdrop-blur-md border-y border-l border-white/5 rounded-l-3xl text-white hover:bg-slate-700 hover:pr-2 transition-all shadow-xl shadow-black/20"
-           title="Toggle Sidebar"
-         >
-           {isRightSidebarOpen ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-         </button>
-
       </section>
 
       {/* RIGHT SIDEBAR TRANSITION WRAPPER */}
-      <div className={`h-full transition-all duration-500 ease-[cubic-bezier(0.25,0.1,0.25,1)] overflow-hidden border-l border-white/5 ${isRightSidebarOpen ? 'w-80 opacity-100' : 'w-0 opacity-0 border-none'}`}>
-        <div className="w-80 h-full bg-slate-950/40 backdrop-blur-xl">
+      <div className={`h-full transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isRightSidebarOpen ? 'w-[360px] opacity-100 translate-x-0' : 'w-0 opacity-0 translate-x-10'}`}>
+        <div className="w-[360px] h-full rounded-[2.5rem] overflow-hidden shadow-2xl shadow-clay-400/20 glass-panel border border-white/60">
            <RightSidebar />
         </div>
       </div>

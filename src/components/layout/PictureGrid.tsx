@@ -222,7 +222,7 @@ function getTileColorClass(label: string, isFolder?: boolean): string {
   if (WORD_COLORS[lower]) return WORD_COLORS[lower];
 
   // Default for normal items
-  return 'bg-slate-800 border-slate-700/50 text-slate-200'
+  return 'bg-white/40 backdrop-blur-md border-white/60 text-clay-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:bg-white/60 hover:border-white'
 }
 
 const MemoTile = React.memo(({ label, icon: Icon, color, onTileClick, isFolder, isDimmed, isRecommended }: { 
@@ -237,34 +237,39 @@ const MemoTile = React.memo(({ label, icon: Icon, color, onTileClick, isFolder, 
   // Determine background/border/text style
   const colorClass = getTileColorClass(label, isFolder);
   
-  // Check if we are using a specific colored background (not the default slate-800)
-  const hasColorBg = !colorClass.includes('bg-slate-800');
+  // Check if we are using a specific colored background (not white)
+  const hasColorBg = !colorClass.includes('bg-white');
   
   // For folders (white bg), we want colored icons. For other colored tiles, we generally want dark icons.
   // Use the passed `color` prop if available (for folders), otherwise dark if bg is light, otherwise light.
   const iconClass = isFolder 
-     ? (color ? color.replace('text-', 'text-') : 'text-slate-900') // Keep original color for folders 
-     : (hasColorBg ? 'text-slate-900 opacity-80' : (color || 'text-slate-300'));
+     ? (color ? color.replace('text-', 'text-') : 'text-clay-900') // Keep original color for folders 
+     : (hasColorBg ? 'text-slate-900 opacity-80' : (color || 'text-clay-400'));
 
   return (
     <button 
       onClick={() => onTileClick(label, isFolder)}
       className={`
-        group flex flex-col items-center justify-center text-center
+        group relative flex flex-col items-center justify-center text-center overflow-hidden
         aspect-square w-full
-        rounded-2xl p-2
+        rounded-[1.5rem] p-3
         cursor-pointer
-        border transition-all duration-500
-        ${isDimmed ? 'opacity-60 scale-95 border-transparent shadow-none hover:opacity-100 hover:scale-100 hover:z-20' : ''}
-        ${isRecommended ? 'z-10 scale-110 shadow-[0_0_20px_rgba(56,189,248,0.5)] ring-4 ring-sky-400 brightness-110' : ''}
-        ${!isDimmed && !isRecommended ? 'hover:scale-105 hover:brightness-110 shadow-sm' : ''}
+        border transition-all duration-300
+        ${isDimmed ? 'opacity-40 scale-95 border-transparent shadow-none grayscale hover:filter-none hover:opacity-100 hover:scale-100 hover:z-20' : ''}
+        ${isRecommended ? 'z-10 scale-105 shadow-[0_0_30px_rgba(220,38,38,0.25)] ring-4 ring-crimson/40 brightness-105' : ''}
+        ${!isDimmed && !isRecommended ? 'hover:scale-105 hover:shadow-xl hover:-translate-y-1' : ''}
         ${colorClass}
+        ${hasColorBg ? 'bg-opacity-90 backdrop-blur-sm shadow-lg shadow-clay-500/10' : ''}
       `}
     >
+      {/* Glass Shine Effect */}
+      <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-black/5 opacity-50 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+
       {Icon && (
-        <Icon className={`w-8 h-8 mb-1 ${iconClass}`} />
+        <Icon className={`w-8 h-8 mb-2 relative z-10 drop-shadow-sm ${iconClass}`} />
       )}
-      <span className="text-xs sm:text-sm font-bold leading-tight break-words line-clamp-2">
+      <span className="text-xs sm:text-sm font-bold leading-tight break-words line-clamp-2 relative z-10 drop-shadow-sm">
         {label}
       </span>
     </button>

@@ -29,3 +29,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to save message' }, { status: 500 });
   }
 }
+
+export async function DELETE() {
+  try {
+    await connectToDatabase();
+    await Message.deleteMany({}); // Wipes everything
+    return NextResponse.json({ message: 'History cleared' });
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to clear history' }, { status: 500 });
+  }
+}

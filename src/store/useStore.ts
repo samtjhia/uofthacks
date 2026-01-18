@@ -85,6 +85,7 @@ export interface AppState {
   engineLogs: { id: string, timestamp: string, message: string, type: 'info' | 'success' | 'warning' | 'error' }[];
   addEngineLog: (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
   cacheStats: { size: number, max: number };
+  memories: { id: string; text: string; timestamp: string }[]; // <--- New State
 
   // Actions
   addHistoryItem: (item: ChatMessage) => Promise<void>;
@@ -93,6 +94,8 @@ export interface AppState {
 
   // Async Actions
   fetchHistory: () => Promise<void>;
+  clearHistory: () => Promise<void>; 
+  fetchMemories: () => Promise<void>; // <--- New Action
   fetchSuggestions: (onlySignals?: boolean) => Promise<void>;
   fetchSchedule: () => Promise<void>;
   addScheduleItem: (label: string, timeBlock: 'morning' | 'afternoon' | 'evening', startTime?: string, durationMinutes?: number) => Promise<void>;
@@ -127,6 +130,7 @@ export const useStore = create<AppState>((set, get) => ({
   setInputMode: (mode) => set({ inputMode: mode, schedulerAddingToBlock: null }),
   
   typedText: '',
+  memories: [], // Init empty
   pictureCategory: null,
   setPictureCategory: (cat) => set({ pictureCategory: cat }),
   setTypedText: (text) => {
@@ -176,7 +180,11 @@ export const useStore = create<AppState>((set, get) => ({
             // EXTRACT LAST PARTNER MESSAGE (Signal 1 - Explicit)
             // Look for the last message that is NOT from the user.
             const lastPartnerMsgObj = [...state.history].reverse().find(m => m.role !== 'user');
-            const lastPartnerMessage = lastPartnerMsgObj ? lastPartnerMsgObj.content : null;
+            // CLEANUP: Remove "Partner: " prefix if present, to give clean text to the Brain
+            const rawPartnerContent = lastPartnerMsgObj ? lastPartnerMsgObj.content : null;
+            const lastPartnerMessage = rawPartnerContent 
+               ? rawPartnerContent.replace(/^Partner:\s*"/, '').replace(/"$/, '').replace(/^Partner:\s*/, '')
+               : null;
 
             // FIX: Do NOT trim text. "so" (completions) and "so " (next word) are different states.
             // Cache Key now includes Schedule to differentiate contexts (e.g. Beach vs Home)
@@ -361,7 +369,30 @@ export const useStore = create<AppState>((set, get) => ({
       console.error('Failed to fetch suggestions:', error);
     }
   },
-fetchSchedule: async () => {
+
+  clearHistory: async () => {
+    try {
+        set({ history: [] }); // Optimistic clear
+        await fetch('/api/history', { method: 'DELETE' });
+        get().addEngineLog('History cleared', 'success');
+    } catch (err) {
+        console.error("Failed to clear history", err);
+    }
+  },
+
+  fetchMemories: async () => {
+    try {
+        const res = await fetch('/api/memories');
+        const data = await res.json();
+        if (data.memories) {
+            set({ memories: data.memories });
+        }
+    } catch (err) {
+        console.error('Failed to fetch memories', err);
+    }
+  },
+
+  fetchSchedule: async () => {
     try {
       const res = await fetch('/api/schedule');
       if (res.ok) {

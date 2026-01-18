@@ -178,7 +178,7 @@ export default function Cockpit() {
                 {typedText ? (
                   <>
                     {typedText}
-                    <span className="w-0.5 h-6 bg-sky-400 ml-2 animate-pulse inline-block" />
+                    <span className="w-0.5 h-6 bg-sky-400 ml-[2px] animate-pulse inline-block" />
                   </>
                 ) : (
                   <>

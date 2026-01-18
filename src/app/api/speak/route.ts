@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { DEFAULT_VOICE_ID, DEFAULT_ELEVENLABS_MODEL } from '@/lib/voice';
+import { analyzeAndStoreMemory } from '@/lib/memory';
 
 export async function POST(req: Request) {
   const { text, voiceId, model, settings } = await req.json();
+
+  // Fire-and-forget memory analysis (don't block the audio generation)
+  analyzeAndStoreMemory(text).catch(err => console.error("Memory Analysis Background Error:", err));
 
   const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
   const VOICE_ID = voiceId || DEFAULT_VOICE_ID;

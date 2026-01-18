@@ -1,30 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import OpenAI from 'openai';
 import { SuggestionResponse } from '@/types';
-
-// --- CONFIGURATION ---
-// Change this to 'gemini' or 'openai' to switch providers
-const ACTIVE_PROVIDER: 'gemini' | 'openai' = (process.env.AI_PROVIDER as 'gemini' | 'openai') || 'openai';
-
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-
-// Initialize OpenAI
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY || '',
-});
+import { generateCompletion } from '@/lib/ai';
+import { searchMemory } from '@/lib/memory';
 
 export async function POST(req: NextRequest) {
   try {
     const { text, history, lastPartnerMessage, time, schedule, userProfile, habits } = await req.json();
 
-    // Check Keys based on provider
-    if (ACTIVE_PROVIDER === 'gemini' && !process.env.GEMINI_API_KEY) {
-       return NextResponse.json({ error: 'GEMINI_API_KEY not configured' }, { status: 500 });
-    }
-    if (ACTIVE_PROVIDER === 'openai' && !process.env.OPENAI_API_KEY) {
-       return NextResponse.json({ error: 'OPENAI_API_KEY not configured' }, { status: 500 });
+    // 1. MEMORY ENGINE (Signal 3)
+    // If the partner just spoke, search memory for context about what they said.
+    let memoryContext = "";
+    if (lastPartnerMessage) {
+        console.log(`🔍 [Signal 3] Searching Memory for: "${lastPartnerMessage}"`);
+        // Search for key terms in the partner's message
+        // Optimization: We could use an LLM to extract keywords first, but raw search works for hackathons
+        const memories = await searchMemory(lastPartnerMessage);
+        if (memories.length > 0) {
+            memoryContext = memories.map(m => `"${m.text}"`).join('; ');
+            console.log("🧠 Memory Hit:", memoryContext);
+        } else {
+            console.log("🤷‍♂️ Memory Miss: No relevant memories found.");
+        }
     }
 
 
@@ -54,14 +50,18 @@ export async function POST(req: NextRequest) {
       1. **Signal 6 [The Filter]**: HARD CONSTRAINT. Predictions MUST start with the current input: "${text}". 
          - **EXCEPTION**: If input is EMPTY, predict 4 distinct conversation starters or RESPONSES based on History.
       2. **Signal 1 [The Listener]**: **CRITICAL - MAXIMUM PRIORITY**. If the last history message is from 'partner' or is a QUESTION, your main job is to answer it. Ignoring a direct question is a failure.
-      3. **Signal 4 [The Habits]**: High Priority. Users repeat themselves. If a frequent habit matches the input/context, it wins.
-      4. **Signal 2 [The Scheduler]**: Context Booster. If the schedule says "Art Class", boost words like "paint", "color", "canvas".
-      5. **Signal 5 [The Grammar]**: Syntactic Validity. Ensure the sentence makes grammatical sense.
+      3. **Signal 3 [The Memory]**: Long-Term Info. Use this to answer specific factual questions (e.g., "When is the wedding?").
+      4. **Signal 4 [The Habits]**: High Priority. Users repeat themselves. If a frequent habit matches the input/context, it wins.
+      5. **Signal 2 [The Scheduler]**: Context Booster. If the schedule says "Art Class", boost words like "paint", "color", "canvas".
+      6. **Signal 5 [The Grammar]**: Syntactic Validity. Ensure the sentence makes grammatical sense.
 
       # Current State Signals
       ${systemContext}
       [Signal 1 - Recent History (MOST IMPORTANT FOR CONTEXT)]:
       ${history || "None"}
+
+      [Signal 3 - Retrieved Memories (Long-Term Facts)]:
+      ${memoryContext || "No relevant memories found."}
       
       [Signal 1.5 - LATEST PARTNER MESSAGE (The Trigger)]:
       "${lastPartnerMessage || "None"}"
@@ -77,6 +77,7 @@ export async function POST(req: NextRequest) {
       2. **IF INPUT IS EMPTY**: 
          - **FOCUS ON [Signal 1.5 - LATEST PARTNER MESSAGE]**: This is the message you are responding to. Ignore older history if this is present.
          - **CASE A: Partner Message is a QUESTION**: Your 4 predictions MUST be direct answers to it.
+            - **CRITICAL**: Check [Signal 3 - Retrieved Memories]. If a memory provides the answer (e.g. Question: "What is my fav color?", Memory: "Sam's fav color is green"), you MUST provide that answer as the Top Prediction.
             - Example: "What is your name?" -> Predictions: "My name is...", "Sam", "I'm Sam", "Don't ask".
          - **CASE B: Partner Message is a STATEMENT/GREETING** (e.g. "Hello there"): Your predictions MUST be relevant follow-ups/replies.
             - Example: "Hello there" -> Predictions: "Hi!", "How are you?", "Good to see you", "Hey".
@@ -113,29 +114,20 @@ export async function POST(req: NextRequest) {
     `;
 
     let rawText = "";
+    let usedModel = "";
 
-    console.log(`🧠 Predicting with Provider: ${ACTIVE_PROVIDER.toUpperCase()}`);
-
-    if (ACTIVE_PROVIDER === 'openai') {
-        const completion = await openai.chat.completions.create({
-            messages: [
-                { role: "system", content: "You are a predictive text engine. Output JSON only." },
-                { role: "user", content: prompt }
-            ],
-            model: "gpt-4o-mini", // Recommended for speed/cost (comparable to Flash)
-            response_format: { type: "json_object" },
-            temperature: 0.7,
-        });
-        rawText = completion.choices[0].message.content || "{}";
-        console.log("OpenAI Raw:", rawText);
-    } 
-    else {
-        // Use Gemini 2.0 Flash Experimental
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        rawText = response.text();
-        console.log("Gemini Raw:", rawText);
+    try {
+        const result = await generateCompletion(
+            "You are a predictive text engine. Output JSON only.",
+            prompt,
+            true
+        );
+        rawText = result.text;
+        usedModel = result.model;
+        console.log(`🧠 AI Response [${usedModel}]:`, rawText.substring(0, 100) + "...");
+    } catch (e) {
+        console.error("AI Generation Failed:", e);
+        throw e;
     }
 
     // Clean up markdown if AI adds it (Gemini often does, OpenAI in JSON mode usually doesn't but safe to keep)
@@ -159,7 +151,7 @@ export async function POST(req: NextRequest) {
             }
         }
     } catch (e) {
-      console.error("Failed to parse Gemini response:", rawText);
+      console.error("Failed to parse Gemini/OpenAI response:", rawText);
       predictions = [
         { word: "Yes", sentence: "Yes" }, 
         { word: "No", sentence: "No" }, 
@@ -170,15 +162,12 @@ export async function POST(req: NextRequest) {
 
     // Map to SuggestionResponse
     const suggestions: SuggestionResponse[] = predictions.map((pred, idx) => ({
-      id: `${ACTIVE_PROVIDER}-${Date.now()}-${idx}`,
+      id: `ai-${Date.now()}-${idx}`,
       label: pred.word, 
       text: pred.sentence, // Store the full sentence here
       type: 'prediction',
       confidence: 0.9 - (idx * 0.1)
     }));
-    
-    // MODEL METADATA
-    const usedModel = ACTIVE_PROVIDER === 'openai' ? 'gpt-4o-mini' : 'gemini-2.0-flash-exp';
 
     return NextResponse.json({ suggestions, reasoning, model: usedModel });
 

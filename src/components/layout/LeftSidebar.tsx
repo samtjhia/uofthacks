@@ -16,17 +16,35 @@ import {
   History,
   BrainCircuit,
   Terminal,
-  Zap
+  Zap,
+  Trash2,
+  HardDrive,
+  RefreshCw
 } from 'lucide-react';
 
 export default function LeftSidebar() {
-  const { history, isListening, fetchHistory, engineLogs, cacheStats, activeModel } = useStore((state: AppState) => state);
-  const [activeTab, setActiveTab] = useState<'history' | 'brain'>('history');
+  const { history, fetchHistory, clearHistory, engineLogs, cacheStats, activeModel, memories, fetchMemories } = useStore((state: AppState) => state);
+  const [activeTab, setActiveTab] = useState<'history' | 'brain' | 'memory'>('history');
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const dummyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchHistory();
   }, []);
+
+  // Fetch memories when switching to Memory tab
+  useEffect(() => {
+      if (activeTab === 'memory') {
+          fetchMemories();
+      }
+  }, [activeTab]);
+
+  const handleRefreshMemories = async () => {
+      setIsRefreshing(true);
+      await fetchMemories();
+      setTimeout(() => setIsRefreshing(false), 500);
+  };
+
 
   useEffect(() => {
      // Scroll to top of logs when updated, or bottom? Usually terminals scroll to bottom.
@@ -77,6 +95,17 @@ export default function LeftSidebar() {
            <BrainCircuit className="w-4 h-4" />
            <span>Engine</span>
         </button>
+        <button 
+          onClick={() => setActiveTab('memory')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium transition-all ${
+            activeTab === 'memory' 
+              ? 'bg-slate-800 text-emerald-400 shadow-sm' 
+              : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+          }`}
+        >
+           <Database className="w-4 h-4" />
+           <span>Memory</span>
+        </button>
       </div>
 
       {/* CONTENT AREA */}
@@ -91,6 +120,24 @@ export default function LeftSidebar() {
                     <p className="text-sm">No recent history</p>
                 </div>
             )}
+            
+            {/* Clear Button (Visible only when history exists) */}
+            {history.length > 0 && (
+                <div className="sticky top-0 z-10 flex justify-center pb-2">
+                    <button 
+                        onClick={() => {
+                            if (window.confirm('Are you sure you want to permanently delete all conversation history?')) {
+                                clearHistory();
+                            }
+                        }}
+                        className="flex items-center gap-2 px-3 py-1 rounded-full bg-red-900/40 text-red-200 border border-red-500/20 text-xs font-semibold backdrop-blur-md hover:bg-red-900/60 transition-all"
+                    >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Clear All</span>
+                    </button>
+                </div>
+            )}
+
             {history.map((msg) => (
               <div 
                 key={msg.id} 
@@ -181,6 +228,46 @@ export default function LeftSidebar() {
                         <span className="animate-pulse">_</span>
                     </div>
                 </div>
+           </div>
+        )}
+
+        {/* === TAB 3: LONG TERM MEMORY === */}
+        {activeTab === 'memory' && (
+           <div className="h-full overflow-y-auto p-4 space-y-4 bg-slate-900/40">
+               
+               {/* Header / Refresh */}
+               <div className="flex justify-between items-center mb-2 px-1">
+                   <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Saved Facts</h3>
+                   <button 
+                     onClick={handleRefreshMemories}
+                     className={`p-1.5 rounded-lg hover:bg-white/5 text-slate-500 hover:text-emerald-400 transition-all ${isRefreshing ? 'animate-spin text-emerald-500' : ''}`}
+                     title="Refresh Memories"
+                   >
+                       <RefreshCw className="w-3.5 h-3.5" />
+                   </button>
+               </div>
+
+               {(!memories || memories.length === 0) && (
+                   <div className="flex flex-col items-center justify-center py-20 opacity-40 gap-3 text-slate-500">
+                        <Database className="w-10 h-10 stroke-1" />
+                        <p className="text-sm">No long-term memories found</p>
+                   </div>
+               )}
+               {memories && memories.map((m) => (
+                   <div key={m.id} className="p-3 rounded-xl bg-slate-800/40 border border-emerald-500/10 hover:border-emerald-500/30 transition-all group">
+                       <div className="flex items-start gap-3">
+                           <div className="mt-1 p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+                               <HardDrive className="w-3.5 h-3.5" />
+                           </div>
+                           <div>
+                               <p className="text-sm text-slate-200 leading-relaxed group-hover:text-white transition-colors">{m.text}</p>
+                               <p className="text-[10px] text-slate-600 mt-2 font-mono">
+                                   ID: {m.id.slice(0, 8)}... • {new Date(m.timestamp).toLocaleDateString()}
+                               </p>
+                           </div>
+                       </div>
+                   </div>
+               ))}
            </div>
         )}
 

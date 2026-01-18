@@ -11,7 +11,11 @@ import { TimePicker } from './TimePicker';
 import { speakText } from '@/lib/elevenlabs';
 
 export default function Cockpit() {
-  const { isListening, inputMode, setInputMode, typedText, setTypedText, isPredicting, suggestions, addHistoryItem, reinforceHabit, schedulerAddingToBlock, setSchedulerAddingToBlock, addScheduleItem } = useStore();
+  const { 
+    isListening, inputMode, setInputMode, typedText, setTypedText, isPredicting, suggestions, 
+    addHistoryItem, reinforceHabit, schedulerAddingToBlock, setSchedulerAddingToBlock, addScheduleItem,
+    isHighlightEnabled, toggleHighlight 
+  } = useStore();
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [pendingLabel, setPendingLabel] = useState('');
 
@@ -169,6 +173,36 @@ export default function Cockpit() {
                 </button>
             ))}
         </div>
+
+        {/* AI ASSIST TOGGLE (Only in Picture Mode) */}
+        {inputMode === 'picture' && (
+             <button 
+               onClick={toggleHighlight}
+               className={`ml-3 h-12 flex items-center gap-3 px-4 rounded-2xl border transition-all duration-300 ${
+                 isHighlightEnabled 
+                 ? 'bg-sky-500/10 border-sky-500/30' 
+                 : 'bg-slate-800/50 border-white/5 hover:bg-slate-800'
+               }`}
+             >
+                <div className="flex flex-col items-start gap-0.5">
+                    <span className={`text-[10px] font-bold uppercase tracking-wider leading-none ${isHighlightEnabled ? 'text-sky-400' : 'text-slate-400'}`}>
+                        AI Assist
+                    </span>
+                    <span className="text-[10px] opacity-60 leading-none text-slate-400">
+                        {isHighlightEnabled ? 'Active' : 'Off'}
+                    </span>
+                </div>
+                
+                {/* Switch Graphic */}
+                <div className={`w-10 h-5 rounded-full relative transition-colors duration-300 ${
+                    isHighlightEnabled ? 'bg-sky-500' : 'bg-slate-700'
+                }`}>
+                    <div className={`absolute top-1 w-3 h-3 rounded-full bg-white shadow-sm transition-all duration-300 ${
+                        isHighlightEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                </div>
+             </button>
+        )}
       </div>
 
       {/* MIDDLE ROW (Input) */}

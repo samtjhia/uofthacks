@@ -45,6 +45,9 @@ export interface AppState {
   toggleLeftSidebar: () => void;
   isRightSidebarOpen: boolean;
   toggleRightSidebar: () => void;
+  // AI Assist
+  isHighlightEnabled: boolean;
+  toggleHighlight: () => void;
   
   // Audio State
   audioLevel: number;
@@ -97,6 +100,7 @@ export interface AppState {
   updateScheduleItem: (id: string, updates: Partial<ScheduleItem>) => Promise<void>;
   deleteScheduleItem: (id: string) => Promise<void>;
   reinforceHabit: (text: string) => Promise<void>;
+  learnTransition: (context: string, next: string) => Promise<void>;
 }
 
 // MOCK DATA (Empty initially to trigger Defaults)
@@ -111,6 +115,9 @@ export const useStore = create<AppState>((set, get) => ({
   toggleLeftSidebar: () => set((state) => ({ isLeftSidebarOpen: !state.isLeftSidebarOpen })),
   isRightSidebarOpen: true,
   toggleRightSidebar: () => set((state) => ({ isRightSidebarOpen: !state.isRightSidebarOpen })),
+  
+  isHighlightEnabled: true,
+  toggleHighlight: () => set((state) => ({ isHighlightEnabled: !state.isHighlightEnabled })),
 
   audioLevel: 0,
   setAudioLevel: (level) => set({ audioLevel: level }),
@@ -406,6 +413,24 @@ fetchSchedule: async () => {
       });
     } catch (error) {
       console.error('Failed to reinforce habit:', error);
+    }
+  },
+
+  learnTransition: async (context: string, next: string) => {
+    try {
+      if (!context || !next) return;
+      
+      // Log learning
+      get().addEngineLog(`🧠 Knowledge Updated: "${context}" -> "${next}"`, 'info');
+
+      // Update DB for future Reflex use
+      fetch('/api/learn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ context, next }),
+      }).catch(err => console.error("Learn fetch error:", err));
+    } catch (error) {
+      console.error('Failed to learn transition behavior:', error);
     }
   },
 }));

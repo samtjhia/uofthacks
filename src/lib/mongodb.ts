@@ -7,13 +7,13 @@ if (!MONGODB_URI) {
 }
 
 interface MongooseCache {
-  conn: typeof mongoose | null;
-  promise: Promise<typeof mongoose> | null;
+  conn: mongoose.Connection | null;
+  promise: Promise<mongoose.Connection> | null;
 }
 
 // Global interface to prevent TS errors on global object
 declare global {
-  var mongoose: MongooseCache | undefined;
+  var mongoose: MongooseCache;
 }
 
 let cached: MongooseCache = global.mongoose || { conn: null, promise: null };
@@ -33,7 +33,7 @@ async function dbConnect() {
     };
 
     cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose) => {
-      return mongoose;
+      return mongoose.connection;
     });
   }
 

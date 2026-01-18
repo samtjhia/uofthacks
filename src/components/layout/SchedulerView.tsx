@@ -113,7 +113,7 @@ const layoutSchedule = (items: ScheduleItem[], blockStart: number, blockDuration
         
         // 1. Calculate max simultaneous items at any point in this cluster's time range
         // Scan line algo
-        const events = [];
+        const events: { t: number; type: number; id: string }[] = [];
         cluster.forEach(x => {
             events.push({t: x._start, type: 1, id: x._id});
             events.push({t: x._end, type: -1, id: x._id});
